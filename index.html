@@ -91,17 +91,16 @@
     </p>
     <p>
       Pelt intruders with whatever's in your purse using <b>Space</b> or <b>Left Click</b>.
-      Switch weapons with <b>1</b> (Candy), <b>2</b> (Rolling Pin), <b>3</b> (Teacup) — hitting
-      an enemy with the Teacup or a special item gives it a <b>red hue and slows it down</b>.
+      Switch weapons with <b>1</b> (Candy), <b>2</b> (Rolling Pin), <b>3</b> (Teacup) — the Teacup
+      and special items slow enemies with a <b>red hue</b>.
     </p>
     <p>
-      Watch for <b>✨ sparkly pickups</b> — small ones are quick and weak, big ones like a
-      Watermelon or Garden Statue hit hard but take a beat to throw. The <b>Smelly Sock</b> and
-      <b>Frisbee</b> fly clean through the whole lane, knocking everyone in their path into
-      retreat and taking out two or more at once. Find a <b>Bin Bag</b> and it's game over for
-      that lane — she turns, sprints right off-screen, and flattens everything in her path before
-      dashing back. Sometimes several pickups appear across different lanes at once — grab one
-      before it fades, then press <b>4</b> to unleash it.
+      Watch for <b>✨ sparkly pickups</b>. Small ones are quick and weak; big ones like the
+      Watermelon or Garden Statue hit hard. The <b>Smelly Sock</b> and <b>Frisbee</b> fly through
+      the whole lane, taking out two or more intruders. Grab a <b>Bin Bag</b> and she charges
+      off-screen, flattening her lane. Watch out for the <b>Clone Swarm</b> to destroy all
+      intruders. Find a <b>Mystery Vegetable</b> and unleash a vegetable hailstorm. Grab any item
+      before they disappear and press <b>4</b> to unleash them.
     </p>
     <p>
       Get caught next to an enemy while out of position and you'll be startled back to the porch!
@@ -153,16 +152,31 @@
     melon:   { name: 'Watermelon',    emoji: '🍉', size: 'large',  cooldown: 900, speed: 300, damage: 16, knockback: 90,  stun: 0,    uses: 1, weight: 1 },
     statue:  { name: 'Garden Statue', emoji: '🗿', size: 'large',  cooldown: 1000, speed: 280, damage: 22, knockback: 110, stun: 400,  slowFactor: 0.3, uses: 1, weight: 1 },
     frisbee: { name: 'Frisbee',       emoji: '🥏', size: 'medium', cooldown: 450, speed: 440, damage: 6,  knockback: 60,  stun: 0,    uses: 2, weight: 2, pierce: true },
+    veggiestorm: { name: 'Mystery Vegetable', emoji: '🥕', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 1, special: 'hailstorm' },
     // special: 'charge' — instead of a projectile, the player herself turns and sprints off-screen through her lane, flattening everything in her path.
-    binbag:  { name: 'Bin Bag',       emoji: '🗑️', size: 'large',  cooldown: 800, damage: 0,  knockback: 0,   stun: 0,    uses: 1, weight: 2, special: 'charge' }
+    binbag:  { name: 'Bin Bag',       emoji: '🗑️', size: 'large',  cooldown: 800, damage: 0,  knockback: 0,   stun: 0,    uses: 1, weight: 2, special: 'charge' },
+    // special: 'clone' — spawns 3 copies of her head: one straight out her lane, two peeling off diagonally into the other lanes.
+    clonehead: { name: 'Clone Swarm', emoji: '👤', size: 'large', cooldown: 600, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 2, special: 'clone' }
   };
+
+  // Bin Bag and Clone Swarm don't spawn through the regular pool — they alternate on their own fixed timer (see ULTIMATE_INTERVAL).
+  const ULTIMATE_KEYS = ['binbag', 'clonehead'];
   const ITEM_POOL = [];
   Object.keys(ITEM_TYPES).forEach(key => {
+    if (ULTIMATE_KEYS.includes(key)) return;
     const w = ITEM_TYPES[key].weight || 1;
     for (let i = 0; i < w; i++) ITEM_POOL.push(key);
   });
   function pickWeightedItem() { return ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)]; }
+
   const CHARGE_SPEED = 900;
+  const CLONE_SPEED = 750;
+  const CLONE_TURN_SPEED = 260;
+  const HAIL_FALL_SPEED = 900;
+  const HAIL_STRIKE_EVERY = 110;
+  const HAILSTORM_DURATION = 2400;
+  const VEGGIES = ['🥕', '🥦', '🌽', '🍅', '🥔', '🫑'];
+  const ULTIMATE_INTERVAL = 7000;
 
   const ALL_WEAPONS = Object.assign({}, WEAPONS, ITEM_TYPES);
   const PICKUP_LIFETIME = 8000;
@@ -206,7 +220,7 @@
     }
   };
 
-  let player, projectiles, enemies, particles, floaters, pickups;
+  let player, projectiles, enemies, particles, floaters, pickups, clones, hailstones;
   let score, lives, wave, spawnTimer, spawnInterval, waveTimer, lastTime, running, gameOver;
   let keys = {};
   let currentWeaponIdx = 0;
@@ -214,9 +228,13 @@
   let specialWeapon = null; // { type, usesLeft }
   let pickupTimer = 0;
   let pickupInterval = 7000;
+  let ultimateTimer = 0;
   let lastShot = 0;
   let shake = 0;
   let throwLockUntil = 0;
+  let hailstormActive = false;
+  let hailstormEndTime = 0;
+  let hailstormSpawnTimer = 0;
 
   function resetGame() {
     player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
@@ -225,6 +243,8 @@
     particles = [];
     floaters = [];
     pickups = [];
+    clones = [];
+    hailstones = [];
     score = 0;
     lives = 3;
     wave = 1;
@@ -236,9 +256,13 @@
     specialWeapon = null;
     pickupTimer = 0;
     pickupInterval = 7000;
+    ultimateTimer = 0;
     lastShot = 0;
     shake = 0;
     throwLockUntil = 0;
+    hailstormActive = false;
+    hailstormEndTime = 0;
+    hailstormSpawnTimer = 0;
     running = true;
     gameOver = false;
   }
@@ -281,6 +305,14 @@
     });
   }
 
+  function spawnUltimatePickup() {
+    // Bin Bag and Clone Swarm alternate randomly on their own fixed 7s rotation
+    const laneIdx = Math.floor(Math.random() * 3);
+    const type = ULTIMATE_KEYS[Math.floor(Math.random() * ULTIMATE_KEYS.length)];
+    const x = PICKUP_X_MIN + Math.random() * (PICKUP_X_MAX - PICKUP_X_MIN);
+    pickups.push({ type, lane: laneIdx, x, y: LANES[laneIdx], bob: Math.random()*Math.PI*2, life: PICKUP_LIFETIME });
+  }
+
   function currentWeaponKey() {
     return activeSlot === 'special' && specialWeapon ? specialWeapon.type : WEAPON_ORDER[currentWeaponIdx];
   }
@@ -291,6 +323,29 @@
     throwLockUntil = performance.now() + 4000; // released early once she's back at the porch
     shake = 200;
     addFloater(player.x, player.y - 40, 'TAKING OUT THE TRASH!', '#ffaa33');
+  }
+
+  function triggerCloneSwarm() {
+    // one clone straight down her own lane, the other two peel off diagonally into the remaining lanes
+    const startLane = player.lane;
+    for (let laneIdx = 0; laneIdx < 3; laneIdx++) {
+      clones.push({
+        x: player.x,
+        y: player.y,
+        targetY: LANES[laneIdx],
+        settled: laneIdx === startLane,
+        hitSet: new Set()
+      });
+    }
+    shake = 200;
+    addFloater(player.x, player.y - 40, 'CLONE SWARM!', '#66ccff');
+  }
+
+  function triggerVeggieHailstorm() {
+    hailstormActive = true;
+    hailstormEndTime = performance.now() + HAILSTORM_DURATION;
+    hailstormSpawnTimer = HAIL_STRIKE_EVERY; // strike almost immediately
+    addFloater(player.x, player.y - 40, 'VEGETABLE HAILSTORM!', '#7CFC00');
   }
 
   function throwWeapon() {
@@ -304,6 +359,10 @@
 
     if (w.special === 'charge') {
       triggerBinBagCharge();
+    } else if (w.special === 'clone') {
+      triggerCloneSwarm();
+    } else if (w.special === 'hailstorm') {
+      triggerVeggieHailstorm();
     } else {
       projectiles.push({
         x: player.x + 26,
@@ -381,6 +440,64 @@
       const w = ALL_WEAPONS[p.weapon];
       p.x += w.speed * dt / 1000;
       if (p.x > W + 20) { projectiles.splice(i, 1); continue; }
+    }
+
+    // clone head swarm: independent copies of her, one straight, two peeling off diagonally, each flattening what they touch
+    for (let i = clones.length - 1; i >= 0; i--) {
+      const c = clones[i];
+      c.x += CLONE_SPEED * dt / 1000;
+      if (!c.settled) {
+        const dy = c.targetY - c.y;
+        const step = CLONE_TURN_SPEED * dt / 1000;
+        if (Math.abs(dy) <= step) { c.y = c.targetY; c.settled = true; }
+        else { c.y += Math.sign(dy) * step; }
+      }
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (Math.abs(e.y - c.y) < LANE_H / 2 && e.x <= c.x + 12 && !c.hitSet.has(e.id)) {
+          c.hitSet.add(e.id);
+          const edef = ENEMY_TYPES[e.type];
+          score += edef.score;
+          addFloater(e.x, e.y - 20, 'CLONED OUT!', '#66ccff');
+          addBurst(e.x, e.y, '#66ccff');
+          enemies.splice(j, 1);
+        }
+      }
+      if (c.x >= W + 40) clones.splice(i, 1);
+    }
+
+    // vegetable hailstorm: random veggies rain across all lanes, wiping out anything they land near
+    if (hailstormActive) {
+      hailstormSpawnTimer += dt;
+      if (hailstormSpawnTimer >= HAIL_STRIKE_EVERY) {
+        hailstormSpawnTimer = 0;
+        const laneIdx = Math.floor(Math.random() * 3);
+        const tx = DOOR_X + 60 + Math.random() * (W - DOOR_X - 90);
+        const veg = VEGGIES[Math.floor(Math.random() * VEGGIES.length)];
+        hailstones.push({ x: tx, y: -20, targetY: LANES[laneIdx], lane: laneIdx, veg, hit: false, rot: Math.random() * Math.PI });
+      }
+      if (performance.now() >= hailstormEndTime) hailstormActive = false;
+    }
+
+    for (let i = hailstones.length - 1; i >= 0; i--) {
+      const hs = hailstones[i];
+      hs.rot += dt * 0.01;
+      hs.y += HAIL_FALL_SPEED * dt / 1000;
+      if (!hs.hit && hs.y >= hs.targetY) {
+        hs.hit = true;
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
+          if (e.lane === hs.lane && Math.abs(e.x - hs.x) < 38) {
+            const edef = ENEMY_TYPES[e.type];
+            score += edef.score;
+            addFloater(e.x, e.y - 20, 'SPLATTED!', '#7CFC00');
+            addBurst(e.x, e.y, '#7CFC00');
+            enemies.splice(j, 1);
+          }
+        }
+        addBurst(hs.x, hs.targetY, '#7CFC00');
+      }
+      if (hs.y > hs.targetY + 20) hailstones.splice(i, 1);
     }
 
     // stationary pickups out on the lawn — walk out to grab them before time runs out
@@ -511,6 +628,12 @@
     if (pickupTimer >= pickupInterval) {
       pickupTimer = 0;
       spawnPickupWave();
+    }
+
+    ultimateTimer += dt;
+    if (ultimateTimer >= ULTIMATE_INTERVAL) {
+      ultimateTimer = 0;
+      spawnUltimatePickup();
     }
 
     // wave progression — as more enemies come at her, pickups show up a bit more often too
@@ -651,6 +774,22 @@
     ctx.closePath();
     ctx.fill();
 
+    ctx.restore();
+  }
+
+  // draws a copy of her head — used for the Clone Swarm pickup, the clones themselves, and the HUD icon
+  function drawPlayerHeadIcon(cx, cy, h, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha !== undefined ? alpha : 1;
+    if (PLAYER_SPRITE.complete && PLAYER_SPRITE.naturalWidth > 0) {
+      const w = h * PLAYER_ASPECT;
+      ctx.drawImage(PLAYER_SPRITE, cx - w/2, cy - h/2, w, h);
+    } else {
+      ctx.font = h + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('👤', cx, cy);
+    }
     ctx.restore();
   }
 
@@ -811,10 +950,31 @@
       ctx.fillText('✨', pk.x, pk.y - px * 0.8);
       if (pk.type === 'binbag') {
         drawBinBag(pk.x, pk.y, px);
+      } else if (pk.type === 'clonehead') {
+        drawPlayerHeadIcon(pk.x, pk.y, px);
       } else {
         ctx.font = px + 'px serif';
         ctx.fillText(def.emoji, pk.x, pk.y);
       }
+      ctx.restore();
+    }
+  }
+
+  function drawClones() {
+    for (const c of clones) {
+      drawPlayerHeadIcon(c.x, c.y, 42, 0.85);
+    }
+  }
+
+  function drawHailstones() {
+    for (const hs of hailstones) {
+      ctx.save();
+      ctx.translate(hs.x, hs.y);
+      ctx.rotate(hs.rot);
+      ctx.font = '22px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hs.veg, 0, 0);
       ctx.restore();
     }
   }
@@ -878,6 +1038,9 @@
       if (specialWeapon.type === 'binbag') {
         drawBinBag(wx + 8, H - 18, 16);
         ctx.fillText('4: ' + def.name + ' x' + specialWeapon.usesLeft, wx + 18, H - 14);
+      } else if (specialWeapon.type === 'clonehead') {
+        drawPlayerHeadIcon(wx + 8, H - 18, 16);
+        ctx.fillText('4: ' + def.name + ' x' + specialWeapon.usesLeft, wx + 18, H - 14);
       } else {
         ctx.fillText('4:' + def.emoji + def.name + ' x' + specialWeapon.usesLeft, wx, H - 14);
       }
@@ -895,7 +1058,9 @@
     drawBackground();
     drawPickups();
     drawEnemies();
+    drawHailstones();
     drawProjectiles();
+    drawClones();
     drawPlayer();
     drawParticles();
     drawFloaters();
@@ -936,7 +1101,7 @@
 
   // idle state before start
   player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
-  enemies = []; projectiles = []; particles = []; floaters = []; pickups = [];
+  enemies = []; projectiles = []; particles = []; floaters = []; pickups = []; clones = []; hailstones = [];
   score = 0; lives = 3; wave = 1; running = false;
   requestAnimationFrame(loop);
 })();
