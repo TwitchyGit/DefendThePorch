@@ -61,8 +61,8 @@
     0%, 100% { transform: rotate(0deg); }
     50% { transform: rotate(90deg); }
   }
-  /* phones in portrait: hide the game, ask for landscape */
-  @media (orientation: portrait) and (max-width: 900px) {
+  /* touchscreens in portrait only — never triggers on a mouse/trackpad device regardless of window size */
+  @media (orientation: portrait) and (pointer: coarse) {
     #wrap { display: none; }
     #rotateOverlay { display: flex; }
   }
@@ -1352,6 +1352,13 @@
   score = 0; lives = 3; wave = 1; running = false;
   requestAnimationFrame(loop);
 })();
+
+// works around a known iOS Safari quirk where the viewport doesn't repaint immediately after rotating
+window.addEventListener('orientationchange', () => {
+  document.body.style.display = 'none';
+  void document.body.offsetHeight; // force a reflow
+  document.body.style.display = '';
+});
 </script>
 </body>
 </html>
