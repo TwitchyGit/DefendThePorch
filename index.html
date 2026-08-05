@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Happy Birthday Deniz: Get Off My Lawn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -106,6 +109,8 @@
     text-align: center;
     border-radius: 6px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     padding: 8px;
   }
   #overlay.hidden { display: none; }
@@ -143,6 +148,10 @@
     width: 100%;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    /* body sets touch-action:none globally so swipes control gameplay — this explicitly
+       re-enables vertical touch scrolling just inside this panel, otherwise iOS Safari
+       blocks touch-scrolling here too and the text/button below it become unreachable. */
+    touch-action: pan-y;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -200,7 +209,8 @@
         the whole lane, taking out two or more intruders. Grab a <b>Bin Bag</b> and she charges
         off-screen, flattening her lane. Watch out for the <b>Clone Swarm</b> to destroy all
         intruders. Find a <b>Mystery Vegetable</b> and unleash a vegetable hailstorm. Grab any item
-        before they disappear and press <b>4</b> to unleash them.
+        before they disappear and press <b>4</b> to unleash them. Catch a <b>Fairy Wand</b> and the
+        whole scene lights up in a burst of magic, just for fun.
       </p>
       <p>
         Get caught next to an enemy while out of position and you'll be startled back to the porch!
@@ -242,7 +252,7 @@
 
   const LANES = [110, 225, 340];
   const LANE_H = 108;
-  const DOOR_X = 95;
+  const DOOR_X = 66;
   const PLAYER_X_MIN = 110;
   const PLAYER_X_MAX = 190; // just one pace off the porch
   const PLAYER_MOVE_SPEED = 260;
@@ -267,22 +277,29 @@
     melon:   { name: 'Watermelon',    emoji: '🍉', size: 'large',  cooldown: 900, speed: 300, damage: 16, knockback: 90,  stun: 0,    uses: 1, weight: 1 },
     statue:  { name: 'Garden Statue', emoji: '🗿', size: 'large',  cooldown: 1000, speed: 280, damage: 22, knockback: 110, stun: 400,  slowFactor: 0.3, uses: 1, weight: 1 },
     frisbee: { name: 'Frisbee',       emoji: '🥏', size: 'medium', cooldown: 450, speed: 440, damage: 6,  knockback: 60,  stun: 0,    uses: 2, weight: 2, pierce: true },
-    veggiestorm: { name: 'Mystery Vegetable', emoji: '🥕', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 1, special: 'hailstorm' },
+    veggiestorm: { name: 'Mystery Vegetable', emoji: '🥕', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 3, special: 'hailstorm' },
     // special: 'charge' — instead of a projectile, the player herself turns and sprints off-screen through her lane, flattening everything in her path.
     binbag:  { name: 'Bin Bag',       emoji: '🗑️', size: 'large',  cooldown: 800, damage: 0,  knockback: 0,   stun: 0,    uses: 1, weight: 2, special: 'charge' },
     // special: 'clone' — spawns 3 copies of her head: one straight out her lane, two peeling off diagonally into the other lanes.
-    clonehead: { name: 'Clone Swarm', emoji: '👤', size: 'large', cooldown: 600, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 2, special: 'clone' }
+    clonehead: { name: 'Clone Swarm', emoji: '👤', size: 'large', cooldown: 600, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 2, special: 'clone' },
+    // instant: true — triggers the moment she touches it, no need to switch to it or press 4. Purely a fun visual flourish, no combat effect.
+    fairywand: { name: 'Fairy Wand', emoji: '🪄', size: 'medium', instant: true, special: 'sparkle' }
   };
 
   // Bin Bag and Clone Swarm don't spawn through the regular pool — they alternate on their own fixed timer (see ULTIMATE_INTERVAL).
+  // The Fairy Wand also skips the weighted pool: it gets a flat FAIRY_WAND_CHANCE roll of its own (see spawnPickupWave).
   const ULTIMATE_KEYS = ['binbag', 'clonehead'];
+  const FAIRY_WAND_CHANCE = 0.15;
   const ITEM_POOL = [];
   Object.keys(ITEM_TYPES).forEach(key => {
-    if (ULTIMATE_KEYS.includes(key)) return;
+    if (ULTIMATE_KEYS.includes(key) || key === 'fairywand') return;
     const w = ITEM_TYPES[key].weight || 1;
     for (let i = 0; i < w; i++) ITEM_POOL.push(key);
   });
-  function pickWeightedItem() { return ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)]; }
+  function pickWeightedItem() {
+    if (Math.random() < FAIRY_WAND_CHANCE) return 'fairywand';
+    return ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)];
+  }
 
   const CHARGE_SPEED = 900;
   const DIAGONAL_TURN_SPEED = 75;
@@ -381,6 +398,10 @@
   let hailstormActive = false;
   let hailstormEndTime = 0;
   let hailstormSpawnTimer = 0;
+  let sparkleActive = false;
+  let sparkleStartTime = 0;
+  let fairySparkles = [];
+  const SPARKLE_DURATION = 5000;
 
   function resetGame() {
     player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
@@ -409,6 +430,9 @@
     hailstormActive = false;
     hailstormEndTime = 0;
     hailstormSpawnTimer = 0;
+    sparkleActive = false;
+    sparkleStartTime = 0;
+    fairySparkles = [];
     running = true;
     gameOver = false;
   }
@@ -520,13 +544,38 @@
     addFloater(player.x, player.y - 40, 'VEGETABLE HAILSTORM!', '#7CFC00');
   }
 
+  // Fairy Wand: no combat effect, just a brief vibrant sparkle over the whole scene
+  const SPARKLE_COLORS = ['#ffd166', '#ff6b9d', '#66ccff', '#b28dff', '#7CFC00', '#ffffff'];
+  function triggerFairySparkle() {
+    sparkleActive = true;
+    sparkleStartTime = performance.now();
+    fairySparkles = [];
+    for (let i = 0; i < 140; i++) {
+      fairySparkles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        size: 3 + Math.random() * 6,
+        phase: Math.random() * Math.PI * 2,
+        speed: 5 + Math.random() * 6,
+        color: SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)]
+      });
+    }
+    addFloater(player.x, player.y - 40, 'MAGIC SPARKLE!', '#ffd166');
+    shake = 160;
+  }
+
   function throwWeapon() {
     const now = performance.now();
     if (now < throwLockUntil) return;
     if (player.chargeState) return;
     const key = currentWeaponKey();
     const w = ALL_WEAPONS[key];
-    if (now - lastShot < w.cooldown) return;
+    // ultimate specials (Bin Bag / Clone Swarm / hailstorm) always fire when selected —
+    // they're single-use pickups, not spammable weapons, so they shouldn't be blocked by
+    // whatever cooldown happens to be left over from the last base weapon thrown. Without
+    // this, throwing candy right before grabbing the Bin Bag could silently eat the button
+    // press with no visible effect.
+    if (!w.special && now - lastShot < w.cooldown) return;
     lastShot = now;
 
     if (w.special === 'charge') {
@@ -652,6 +701,11 @@
       if (performance.now() >= hailstormEndTime) hailstormActive = false;
     }
 
+    // fairy sparkle: purely visual, just runs its course and switches off
+    if (sparkleActive && performance.now() - sparkleStartTime >= SPARKLE_DURATION) {
+      sparkleActive = false;
+    }
+
     for (let i = hailstones.length - 1; i >= 0; i--) {
       const hs = hailstones[i];
       hs.rot += dt * 0.01;
@@ -682,6 +736,14 @@
 
       if (pk.lane === player.lane && Math.abs(pk.x - player.x) < 30) {
         const def = ITEM_TYPES[pk.type];
+        if (def.instant) {
+          // Fairy Wand: fires the moment she touches it, doesn't sit in her purse
+          if (pk.type === 'fairywand') triggerFairySparkle();
+          addFloater(pk.x, pk.y - 20, 'GOT THE ' + def.name.toUpperCase() + '!', '#ffd166');
+          addBurst(pk.x, pk.y, '#ffd166');
+          pickups.splice(i, 1);
+          continue;
+        }
         specialWeapon = { type: pk.type, usesLeft: def.uses };
         activeSlot = 'special';
         updateMobileButtons();
@@ -842,6 +904,14 @@
     document.getElementById('finalScore').textContent = 'Score: ' + score;
     document.getElementById('finalWave').textContent = 'Wave: ' + wave;
     document.getElementById('overlay').classList.remove('hidden');
+    setMobileControlsVisible(false);
+  }
+
+  // the on-screen weapon buttons should only be visible during actual gameplay,
+  // never on the start screen or game-over screen — otherwise they float on top
+  // of and block the Defend the Porch / Try Again buttons on touch devices
+  function setMobileControlsVisible(visible) {
+    document.getElementById('mobileControls').style.display = visible ? '' : 'none';
   }
 
   function drawTree(cx, baseY, scale) {
@@ -1018,16 +1088,250 @@
     drawFence(borderY + 6, W);
 
     // porch / door (in front of everything on the left)
-    ctx.fillStyle = '#8d5a2b';
-    ctx.fillRect(0, 0, DOOR_X, H);
-    ctx.fillStyle = '#5c3a1a';
-    ctx.fillRect(DOOR_X-14, 0, 14, H);
-    ctx.fillStyle = '#3e2712';
-    ctx.font = '18px sans-serif';
+    drawPorch();
+  }
+
+  // a narrow, welcoming front porch: warm plank wall, a glowing lamp and window,
+  // a wreath on the door, a flower box, potted plants either side of the mat,
+  // and Deniz's name in a friendly script over the post
+  // a gingerbread-house porch: chocolate-cookie walls, dripping icing trim, gumdrop studs,
+  // a candy-cane striped door with a gumdrop knob, an icing-framed window, and candy canes
+  // and lollipops standing where you'd expect flowers
+  function drawPorch() {
     ctx.save();
-    ctx.translate(30, H/2);
-    ctx.rotate(-Math.PI/2);
-    ctx.fillText('DENIZ\'S HOUSE', -80, 6);
+
+    const wallGrad = ctx.createLinearGradient(0, 0, DOOR_X, 0);
+    wallGrad.addColorStop(0, '#8a5427');
+    wallGrad.addColorStop(1, '#6b3f1d');
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(0, 0, DOOR_X, H);
+
+    // gumdrops studding the gingerbread wall in a loose grid
+    const gumColors = ['#ff6b9d', '#ffd166', '#7CFC00', '#66ccff', '#ff6b6b', '#b28dff'];
+    let gumIdx = 0;
+    for (let gy = 20; gy < H - 20; gy += 26) {
+      for (let gx = 8; gx < DOOR_X - 10; gx += 15) {
+        // leave a gap for the top window/door vignette and the sign
+        if (gy > 50 && gy < 116 && gx < DOOR_X - 16) continue;
+        ctx.fillStyle = gumColors[gumIdx % gumColors.length];
+        gumIdx++;
+        ctx.beginPath();
+        ctx.arc(gx + (gy % 52 === 20 ? 5 : 0), gy, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.arc(gx + (gy % 52 === 20 ? 5 : 0) - 0.8, gy - 0.8, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // dripping white icing along the roofline at the very top of the porch
+    ctx.fillStyle = '#fff6e8';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(DOOR_X, 0);
+    ctx.lineTo(DOOR_X, 4);
+    for (let x = DOOR_X; x > 0; x -= 10) {
+      ctx.quadraticCurveTo(x - 5, 13, x - 10, 4);
+    }
+    ctx.lineTo(0, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // candy-cane striped door — the real entry threshold, full height along the right edge
+    const doorX = DOOR_X - 13;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(doorX, 0, 13, H);
+    ctx.clip();
+    ctx.fillStyle = '#fff6e8';
+    ctx.fillRect(doorX, 0, 13, H);
+    ctx.strokeStyle = '#d6273c';
+    ctx.lineWidth = 9;
+    for (let sy = -H; sy < H * 2; sy += 18) {
+      ctx.beginPath();
+      ctx.moveTo(doorX - 4, sy);
+      ctx.lineTo(doorX + 17, sy + 18);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(doorX, 0, 13, H);
+    // gumdrop knob
+    ctx.fillStyle = '#7CFC00';
+    ctx.beginPath();
+    ctx.arc(DOOR_X - 4, H / 2 + 8, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(DOOR_X - 4.8, H / 2 + 7.2, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // a little house-front vignette sitting right under the Score/Wave HUD:
+    // a warm iced window on the left, a small candy-striped door beside it on the right
+    const topY = 62;
+    const glowAll = ctx.createRadialGradient(DOOR_X / 2, topY + 16, 2, DOOR_X / 2, topY + 16, 30);
+    glowAll.addColorStop(0, 'rgba(255, 224, 150, 0.55)');
+    glowAll.addColorStop(1, 'rgba(255, 224, 150, 0)');
+    ctx.fillStyle = glowAll;
+    ctx.fillRect(0, topY - 14, DOOR_X, 60);
+
+    // icing-framed window with a gumdrop sill
+    const winW = 20, winH = 26, winX = 6, winY = topY;
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fillRect(winX, winY, winW, winH);
+    ctx.strokeStyle = '#fff6e8';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(winX, winY, winW, winH);
+    ctx.strokeStyle = '#c76b1e';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(winX + winW / 2, winY);
+    ctx.lineTo(winX + winW / 2, winY + winH);
+    ctx.moveTo(winX, winY + winH / 2);
+    ctx.lineTo(winX + winW, winY + winH / 2);
+    ctx.stroke();
+    const boxColors = ['#ff6b6b', '#ffd166', '#66ccff'];
+    boxColors.forEach((c, i) => {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.arc(winX + 3 + i * 6.5, winY + winH + 3, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // small candy-cane striped door with an arched icing top and a gumdrop knob
+    const dW = 16, dH = 32, dX = winX + winW + 8, dY = winY - 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dX, dY + dH);
+    ctx.lineTo(dX, dY + 7);
+    ctx.arc(dX + dW / 2, dY + 7, dW / 2, Math.PI, 0);
+    ctx.lineTo(dX + dW, dY + dH);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = '#fff6e8';
+    ctx.fillRect(dX - 2, dY - 10, dW + 4, dH + 12);
+    ctx.strokeStyle = '#d6273c';
+    ctx.lineWidth = 5;
+    for (let sy = dY - 20; sy < dY + dH + 20; sy += 9) {
+      ctx.beginPath();
+      ctx.moveTo(dX - 4, sy);
+      ctx.lineTo(dX + dW + 4, sy + 9);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#c76b1e';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(dX, dY + dH);
+    ctx.lineTo(dX, dY + 7);
+    ctx.arc(dX + dW / 2, dY + 7, dW / 2, Math.PI, 0);
+    ctx.lineTo(dX + dW, dY + dH);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.arc(dX + dW - 4, dY + dH - 12, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // candy canes and lollipops standing where flower pots would be
+    drawCandyCane(9, H - 22);
+    drawLollipop(DOOR_X - 12, H - 24);
+
+    // peppermint swirl welcome mat
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(DOOR_X / 2 - 20, H - 20, 40, 12);
+    ctx.clip();
+    ctx.fillStyle = '#fff6e8';
+    ctx.fillRect(DOOR_X / 2 - 20, H - 20, 40, 12);
+    ctx.strokeStyle = '#d6273c';
+    ctx.lineWidth = 4;
+    for (let sx = DOOR_X / 2 - 30; sx < DOOR_X / 2 + 30; sx += 8) {
+      ctx.beginPath();
+      ctx.moveTo(sx, H - 22);
+      ctx.lineTo(sx + 10, H - 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(DOOR_X / 2 - 20, H - 20, 40, 12);
+
+    // Deniz's House, in a friendly script, running down the porch post below the house vignette
+    ctx.save();
+    ctx.translate(22, H / 2 + 55);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = "bold 22px 'Dancing Script', cursive";
+    ctx.fillStyle = '#fff6e8';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 3;
+    ctx.fillText("Deniz's House", 0, 0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  // a red-and-white striped candy cane, planted upright
+  function drawCandyCane(cx, baseY) {
+    ctx.save();
+    ctx.translate(cx, baseY);
+    ctx.strokeStyle = '#fff6e8';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.lineTo(0, -14);
+    ctx.arc(-3, -14, 3, 0, Math.PI, true);
+    ctx.lineTo(-6, -11);
+    ctx.stroke();
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.lineTo(0, -14);
+    ctx.arc(-3, -14, 3, 0, Math.PI, true);
+    ctx.lineTo(-6, -11);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#fff6e8';
+    ctx.stroke();
+    ctx.clip();
+    ctx.strokeStyle = '#d6273c';
+    ctx.lineWidth = 1.6;
+    for (let y = 3; y > -18; y -= 4) {
+      ctx.beginPath();
+      ctx.moveTo(-4, y);
+      ctx.lineTo(4, y - 4);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+
+  // a round swirled lollipop on a white stick
+  function drawLollipop(cx, baseY) {
+    ctx.save();
+    ctx.translate(cx, baseY);
+    ctx.strokeStyle = '#fff6e8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.lineTo(0, -14);
+    ctx.stroke();
+    ctx.fillStyle = '#ff6b9d';
+    ctx.beginPath();
+    ctx.arc(0, -18, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff6e8';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, -18, 5, 0.4, Math.PI * 2.2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -18, 2.4, 0.8, Math.PI * 2.4);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -1203,6 +1507,42 @@
     }
   }
 
+  // Fairy Wand payoff: a vibrant color wash pulses over the whole scene while
+  // scattered stars twinkle, both fading out together over SPARKLE_DURATION.
+  function drawFairySparkle() {
+    if (!sparkleActive) return;
+    const elapsed = performance.now() - sparkleStartTime;
+    const t = elapsed / SPARKLE_DURATION;
+    if (t >= 1) return;
+    const envelope = t < 0.08 ? (t / 0.08) : (1 - (t - 0.08) / 0.92);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    const hue = (elapsed / 4) % 360;
+    ctx.fillStyle = 'hsla(' + hue + ', 95%, 68%, ' + (0.55 * envelope) + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+
+    for (const s of fairySparkles) {
+      const twinkle = 0.5 + 0.5 * Math.sin(elapsed / 1000 * s.speed + s.phase);
+      ctx.globalAlpha = Math.max(0, envelope * twinkle);
+      ctx.fillStyle = s.color;
+      const r = s.size * (0.6 + 0.4 * twinkle);
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - r * 2);
+      ctx.lineTo(s.x + r * 0.5, s.y - r * 0.5);
+      ctx.lineTo(s.x + r * 2, s.y);
+      ctx.lineTo(s.x + r * 0.5, s.y + r * 0.5);
+      ctx.lineTo(s.x, s.y + r * 2);
+      ctx.lineTo(s.x - r * 0.5, s.y + r * 0.5);
+      ctx.lineTo(s.x - r * 2, s.y);
+      ctx.lineTo(s.x - r * 0.5, s.y - r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawHUD() {
     ctx.textAlign = 'left';
     ctx.font = 'bold 18px sans-serif';
@@ -1269,6 +1609,7 @@
     drawParticles();
     drawFloaters();
     drawHUD();
+    drawFairySparkle();
     ctx.restore();
   }
 
@@ -1357,17 +1698,20 @@
     document.getElementById('startHint').style.display = 'none';
     resetGame();
     updateMobileButtons();
+    setMobileControlsVisible(true);
   });
   document.getElementById('restartBtn').addEventListener('click', () => {
     document.getElementById('overlay').classList.add('hidden');
     resetGame();
     updateMobileButtons();
+    setMobileControlsVisible(true);
   });
 
   // idle state before start
   player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
   enemies = []; projectiles = []; particles = []; floaters = []; pickups = []; clones = []; hailstones = [];
   score = 0; lives = 3; wave = 1; running = false;
+  setMobileControlsVisible(false);
   requestAnimationFrame(loop);
 })();
 
