@@ -424,8 +424,11 @@
   let fairyWandUsesThisGame = 0;
   const SIDEKICK_THROW_INTERVAL = 4500;
   const SIDEKICK_X = 28;
+  const NINJA_SWORD_SPEED = 620;
   let sidekickActive = false;
   let sidekickTimer = 0;
+  let sidekickLane = 1;
+  let ninjaSwords = [];
 
   // day/night sky cycle + fireworks once it's fully dark
   let fireworksTimer = 2500;
@@ -470,6 +473,8 @@
     fairyWandUsesThisGame = 0;
     sidekickActive = false;
     sidekickTimer = 0;
+    sidekickLane = 1;
+    ninjaSwords = [];
     fireworksTimer = 2500;
     running = true;
     gameOver = false;
@@ -580,20 +585,37 @@
     addFloater(player.x, player.y - 40, 'VEGETABLE HAILSTORM!', '#7CFC00');
   }
 
-  // Confetti Cannon: zero damage, just freezes everyone currently on screen mid-step
-  // and buries the lawn in colorful confetti for a moment.
+  // Confetti Cannon: zero damage — every intruder on screen gets a dense point-blank
+  // blast of confetti right in their face (radiating out from their own position, so
+  // it reads as each of them individually getting blinded), plus a big fan of confetti
+  // fired out from the porch across the whole lawn for spectacle. The same red stun-hue
+  // that every other slow/stun effect uses (drawEnemies' stunTimer glow) kicks in
+  // automatically since this sets stunTimer/slowFactor just like the others.
   function triggerConfettiCannon() {
     enemies.forEach(e => {
       e.stunTimer = Math.max(e.stunTimer, 3200);
       e.slowFactor = 1;
+      for (let i = 0; i < 24; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 40 + Math.random() * 220;
+        particles.push({
+          x: e.x, y: e.y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          life: 900 + Math.random() * 900,
+          color: FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)]
+        });
+      }
     });
-    for (let i = 0; i < 90; i++) {
+    // the cannon itself, fanning a wide blast out from the porch across the lawn
+    for (let i = 0; i < 55; i++) {
+      const ang = -0.65 + Math.random() * 1.3;
+      const spd = 220 + Math.random() * 260;
       particles.push({
-        x: DOOR_X + Math.random() * (W - DOOR_X),
-        y: Math.random() * H * 0.6,
-        vx: (Math.random() - 0.5) * 160,
-        vy: 40 + Math.random() * 160,
-        life: 1200 + Math.random() * 700,
+        x: DOOR_X + 10, y: player.y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        life: 700 + Math.random() * 500,
         color: FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)]
       });
     }
@@ -790,15 +812,51 @@
       sparkleActive = false;
     }
 
-    // Sam: once unlocked he sticks around on the porch for the rest of the game,
-    // lobbing a bit of candy into a random lane every few seconds
+    // Sam: once unlocked he sticks around on the porch for the rest of the game, standing
+    // in whichever lane he's about to throw down, firing a spinning ninja sword every few seconds
     if (sidekickActive) {
       sidekickTimer += dt;
       if (sidekickTimer >= SIDEKICK_THROW_INTERVAL) {
         sidekickTimer = 0;
-        const lane = Math.floor(Math.random() * 3);
-        projectiles.push({ x: SIDEKICK_X + 18, y: LANES[lane], lane, weapon: 'candy' });
-        addBurst(SIDEKICK_X, LANES[lane], '#66ccff');
+        sidekickLane = Math.floor(Math.random() * 3);
+        const sy = LANES[sidekickLane];
+        const sx = SIDEKICK_X + 18;
+        ninjaSwords.push({ x: sx, y: sy, lane: sidekickLane, originX: sx, originY: sy, state: 'out', spin: 0 });
+        addBurst(SIDEKICK_X, sy, '#66ccff');
+      }
+    }
+
+    // ninja swords: fly out, kill the first thing they hit (or reach the end unopposed),
+    // then boomerang back to where Sam threw them from
+    for (let i = ninjaSwords.length - 1; i >= 0; i--) {
+      const sw = ninjaSwords[i];
+      sw.spin += dt * 0.02;
+      if (sw.state === 'out') {
+        sw.x += NINJA_SWORD_SPEED * dt / 1000;
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
+          if (e.lane === sw.lane && Math.abs(e.x - sw.x) < 26) {
+            const edef = ENEMY_TYPES[e.type];
+            score += edef.score;
+            registerKill();
+            addFloater(e.x, e.y - 20, 'SLICED!', '#66ccff');
+            addBurst(e.x, e.y, '#66ccff');
+            enemies.splice(j, 1);
+            sw.state = 'return';
+            break;
+          }
+        }
+        if (sw.x > W + 20) sw.state = 'return';
+      } else {
+        const dx = sw.originX - sw.x, dy = sw.originY - sw.y;
+        const dist = Math.hypot(dx, dy);
+        const step = NINJA_SWORD_SPEED * 1.3 * dt / 1000;
+        if (dist <= step) {
+          ninjaSwords.splice(i, 1);
+          continue;
+        }
+        sw.x += (dx / dist) * step;
+        sw.y += (dy / dist) * step;
       }
     }
 
@@ -1659,14 +1717,29 @@
     }
   }
 
-  // Sam — the secret cosmetic sidekick, once unlocked he just hangs around on the porch
+  // Sam — the secret cosmetic sidekick, once unlocked he stands in whichever lane
+  // he's about to throw a sword down, rather than staying fixed in the middle
   function drawSidekick() {
     if (!sidekickActive) return;
     const bob = Math.sin(performance.now() / 260) * 3;
     ctx.font = '30px serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('🥷', SIDEKICK_X, H / 2 + bob);
+    ctx.fillText('🥷', SIDEKICK_X, LANES[sidekickLane] + bob);
+  }
+
+  // spinning ninja swords Sam throws — boomerang out and back along his lane
+  function drawNinjaSwords() {
+    for (const sw of ninjaSwords) {
+      ctx.save();
+      ctx.translate(sw.x, sw.y);
+      ctx.rotate(sw.spin);
+      ctx.font = '22px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🗡️', 0, 0);
+      ctx.restore();
+    }
   }
 
   function drawEnemies() {
@@ -1906,6 +1979,7 @@
     drawHailstones();
     drawProjectiles();
     drawClones();
+    drawNinjaSwords();
     drawPlayer();
     drawParticles();
     drawFloaters();
