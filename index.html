@@ -189,6 +189,7 @@
   <div id="startHint">
     <div id="startHintScroll">
       <h1>🎂 Happy Birthday Deniz 🎂<br>Get Off My Lawn</h1>
+      <p id="bestScoreStart" style="color:#ffd166; font-weight:bold; margin:0 0 6px;">Best Score: 0</p>
       <p>
         They just keep coming to the door — dogs, cats, the postman, nosy neighbours, delivery
         drivers, politicians, drones, even a delivery truck. Not today.
@@ -210,7 +211,12 @@
         off-screen, flattening her lane. Watch out for the <b>Clone Swarm</b> to destroy all
         intruders. Find a <b>Mystery Vegetable</b> and unleash a vegetable hailstorm. Grab any item
         before they disappear and press <b>4</b> to unleash them. Catch a <b>Fairy Wand</b> and the
-        whole scene lights up in a burst of magic, just for fun.
+        whole scene lights up in a burst of magic, just for fun. A <b>Confetti Cannon</b> won't
+        hurt anyone, but it'll freeze every intruder in a burst of glitter for a moment.
+      </p>
+      <p>
+        Chain kills without letting anyone through and Deniz starts to glow — the longer the
+        streak, the faster she throws, with a bonus sparkle every 10 kills.
       </p>
       <p>
         Get caught next to an enemy while out of position and you'll be startled back to the porch!
@@ -223,6 +229,7 @@
     <h1>THEY GOT IN</h1>
     <p id="finalScore">Score: 0</p>
     <p id="finalWave">Wave: 1</p>
+    <p id="bestScoreFinal" style="color:#ffd166; font-weight:bold;">Best: 0</p>
     <button id="restartBtn">Try Again</button>
   </div>
 </div>
@@ -278,25 +285,32 @@
     statue:  { name: 'Garden Statue', emoji: '🗿', size: 'large',  cooldown: 1000, speed: 280, damage: 22, knockback: 110, stun: 400,  slowFactor: 0.3, uses: 1, weight: 1 },
     frisbee: { name: 'Frisbee',       emoji: '🥏', size: 'medium', cooldown: 450, speed: 440, damage: 6,  knockback: 60,  stun: 0,    uses: 2, weight: 2, pierce: true },
     veggiestorm: { name: 'Mystery Vegetable', emoji: '🥕', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 3, special: 'hailstorm' },
+    // special: 'confetti' — no damage at all, just freezes every enemy currently on screen in a burst of confetti.
+    confetti: { name: 'Confetti Cannon', emoji: '🎉', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 3, special: 'confetti' },
     // special: 'charge' — instead of a projectile, the player herself turns and sprints off-screen through her lane, flattening everything in her path.
     binbag:  { name: 'Bin Bag',       emoji: '🗑️', size: 'large',  cooldown: 800, damage: 0,  knockback: 0,   stun: 0,    uses: 1, weight: 2, special: 'charge' },
     // special: 'clone' — spawns 3 copies of her head: one straight out her lane, two peeling off diagonally into the other lanes.
     clonehead: { name: 'Clone Swarm', emoji: '👤', size: 'large', cooldown: 600, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 2, special: 'clone' },
     // instant: true — triggers the moment she touches it, no need to switch to it or press 4. Purely a fun visual flourish, no combat effect.
-    fairywand: { name: 'Fairy Wand', emoji: '🪄', size: 'medium', instant: true, special: 'sparkle' }
+    fairywand: { name: 'Fairy Wand', emoji: '🪄', size: 'medium', instant: true, special: 'sparkle' },
+    // instant: true, and a secret — a rare permanent cosmetic sidekick who helps out from the porch for the rest of the game.
+    sidekick: { name: 'Sam', emoji: '🥷', size: 'medium', instant: true, special: 'sidekick' }
   };
 
   // Bin Bag and Clone Swarm don't spawn through the regular pool — they alternate on their own fixed timer (see ULTIMATE_INTERVAL).
-  // The Fairy Wand also skips the weighted pool: it gets a flat FAIRY_WAND_CHANCE roll of its own (see spawnPickupWave).
+  // The Fairy Wand and Sam both skip the weighted pool too: they get their own flat-chance rolls (see pickWeightedItem).
   const ULTIMATE_KEYS = ['binbag', 'clonehead'];
   const FAIRY_WAND_CHANCE = 0.15;
+  const SIDEKICK_CHANCE = 0.04;
   const ITEM_POOL = [];
   Object.keys(ITEM_TYPES).forEach(key => {
-    if (ULTIMATE_KEYS.includes(key) || key === 'fairywand') return;
+    if (ULTIMATE_KEYS.includes(key) || key === 'fairywand' || key === 'sidekick') return;
     const w = ITEM_TYPES[key].weight || 1;
     for (let i = 0; i < w; i++) ITEM_POOL.push(key);
   });
   function pickWeightedItem() {
+    // Sam only ever offers himself once — after he's active there's no reason to keep rolling for him
+    if (!sidekickActive && Math.random() < SIDEKICK_CHANCE) return 'sidekick';
     if (Math.random() < FAIRY_WAND_CHANCE) return 'fairywand';
     return ITEM_POOL[Math.floor(Math.random() * ITEM_POOL.length)];
   }
@@ -400,8 +414,26 @@
   let hailstormSpawnTimer = 0;
   let sparkleActive = false;
   let sparkleStartTime = 0;
+  let sparkleDuration = 5000;
   let fairySparkles = [];
   const SPARKLE_DURATION = 5000;
+  const MINI_SPARKLE_DURATION = 1400;
+
+  // combo/streak: consecutive kills without letting anyone reach the door
+  let streak = 0;
+  let fairyWandUsesThisGame = 0;
+  const SIDEKICK_THROW_INTERVAL = 4500;
+  const SIDEKICK_X = 28;
+  let sidekickActive = false;
+  let sidekickTimer = 0;
+
+  // day/night sky cycle + fireworks once it's fully dark
+  let fireworksTimer = 2500;
+  const FIREWORK_COLORS = ['#ff6b9d', '#ffd166', '#66ccff', '#7CFC00', '#b28dff', '#ff6b6b'];
+  const STARS = Array.from({ length: 45 }, () => ({
+    x: Math.random() * W, y: Math.random() * H * 0.5,
+    r: 0.6 + Math.random() * 1.2, phase: Math.random() * Math.PI * 2
+  }));
 
   function resetGame() {
     player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
@@ -432,17 +464,21 @@
     hailstormSpawnTimer = 0;
     sparkleActive = false;
     sparkleStartTime = 0;
+    sparkleDuration = SPARKLE_DURATION;
     fairySparkles = [];
+    streak = 0;
+    fairyWandUsesThisGame = 0;
+    sidekickActive = false;
+    sidekickTimer = 0;
+    fireworksTimer = 2500;
     running = true;
     gameOver = false;
   }
 
+  // every character type is in play right from wave 1 — only their health/speed scale with wave
+  const ENEMY_KEYS = Object.keys(ENEMY_TYPES);
   function pickEnemyType() {
-    const pool = ['dog', 'cat', 'deliveryDriver'];
-    if (wave >= 2) pool.push('postman', 'redhead', 'youngman', 'baldman');
-    if (wave >= 3) pool.push('politician', 'neighbour', 'youngwoman', 'oldwoman', 'blondewoman');
-    if (wave >= 4) pool.push('drone', 'truck', 'dog', 'cat', 'boy');
-    return pool[Math.floor(Math.random() * pool.length)];
+    return ENEMY_KEYS[Math.floor(Math.random() * ENEMY_KEYS.length)];
   }
 
   let enemyIdCounter = 0;
@@ -544,13 +580,38 @@
     addFloater(player.x, player.y - 40, 'VEGETABLE HAILSTORM!', '#7CFC00');
   }
 
-  // Fairy Wand: no combat effect, just a brief vibrant sparkle over the whole scene
+  // Confetti Cannon: zero damage, just freezes everyone currently on screen mid-step
+  // and buries the lawn in colorful confetti for a moment.
+  function triggerConfettiCannon() {
+    enemies.forEach(e => {
+      e.stunTimer = Math.max(e.stunTimer, 3200);
+      e.slowFactor = 1;
+    });
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        x: DOOR_X + Math.random() * (W - DOOR_X),
+        y: Math.random() * H * 0.6,
+        vx: (Math.random() - 0.5) * 160,
+        vy: 40 + Math.random() * 160,
+        life: 1200 + Math.random() * 700,
+        color: FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)]
+      });
+    }
+    addFloater(player.x, player.y - 40, 'CONFETTI CANNON!', '#ff6b9d');
+    shake = 140;
+  }
+
+  // Fairy Wand: no combat effect, just a brief vibrant sparkle over the whole scene.
+  // mini=true is the smaller reward version fired automatically every 10-kill streak —
+  // it doesn't count toward the wizard hat unlock, only real Fairy Wand pickups do.
   const SPARKLE_COLORS = ['#ffd166', '#ff6b9d', '#66ccff', '#b28dff', '#7CFC00', '#ffffff'];
-  function triggerFairySparkle() {
+  function triggerFairySparkle(mini) {
     sparkleActive = true;
     sparkleStartTime = performance.now();
+    sparkleDuration = mini ? MINI_SPARKLE_DURATION : SPARKLE_DURATION;
     fairySparkles = [];
-    for (let i = 0; i < 140; i++) {
+    const count = mini ? 50 : 140;
+    for (let i = 0; i < count; i++) {
       fairySparkles.push({
         x: Math.random() * W,
         y: Math.random() * H,
@@ -560,8 +621,14 @@
         color: SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)]
       });
     }
-    addFloater(player.x, player.y - 40, 'MAGIC SPARKLE!', '#ffd166');
-    shake = 160;
+    if (mini) {
+      addFloater(player.x, player.y - 40, 'STREAK BONUS!', '#ffd166');
+      shake = 90;
+    } else {
+      fairyWandUsesThisGame++;
+      addFloater(player.x, player.y - 40, 'MAGIC SPARKLE!', '#ffd166');
+      shake = 160;
+    }
   }
 
   function throwWeapon() {
@@ -570,12 +637,14 @@
     if (player.chargeState) return;
     const key = currentWeaponKey();
     const w = ALL_WEAPONS[key];
-    // ultimate specials (Bin Bag / Clone Swarm / hailstorm) always fire when selected —
-    // they're single-use pickups, not spammable weapons, so they shouldn't be blocked by
-    // whatever cooldown happens to be left over from the last base weapon thrown. Without
-    // this, throwing candy right before grabbing the Bin Bag could silently eat the button
-    // press with no visible effect.
-    if (!w.special && now - lastShot < w.cooldown) return;
+    // ultimate specials (Bin Bag / Clone Swarm / hailstorm / confetti) always fire when
+    // selected — they're single-use pickups, not spammable weapons, so they shouldn't be
+    // blocked by whatever cooldown happens to be left over from the last base weapon thrown.
+    // Without this, throwing candy right before grabbing the Bin Bag could silently eat the
+    // button press with no visible effect. Regular weapons get faster the longer her kill
+    // streak runs (see comboCooldownMultiplier).
+    const effCooldown = w.cooldown * comboCooldownMultiplier();
+    if (!w.special && now - lastShot < effCooldown) return;
     lastShot = now;
 
     if (w.special === 'charge') {
@@ -584,6 +653,8 @@
       triggerCloneSwarm();
     } else if (w.special === 'hailstorm') {
       triggerVeggieHailstorm();
+    } else if (w.special === 'confetti') {
+      triggerConfettiCannon();
     } else {
       projectiles.push({
         x: player.x + 26,
@@ -614,6 +685,17 @@
     }
   }
 
+  // combo/streak: every kill (from any source) extends it, letting an enemy reach the
+  // door resets it. A running streak throws faster and makes her glow; every 10 kills
+  // fires a free mini sparkle as a reward.
+  function comboCooldownMultiplier() {
+    return Math.max(0.55, 1 - streak * 0.03);
+  }
+  function registerKill() {
+    streak++;
+    if (streak > 0 && streak % 10 === 0) triggerFairySparkle(true);
+  }
+
   function update(dt) {
     // Bin Bag charge: she's sprinting off-screen (or running back) — no normal control during this
     if (player.chargeState === 'out') {
@@ -624,6 +706,7 @@
           player.chargeHit.add(e.id);
           const edef = ENEMY_TYPES[e.type];
           score += edef.score;
+          registerKill();
           addFloater(e.x, e.y - 20, 'FLATTENED!', '#ff6666');
           addBurst(e.x, e.y, '#ffaa33');
           enemies.splice(i, 1);
@@ -680,6 +763,7 @@
           c.hitSet.add(e.id);
           const edef = ENEMY_TYPES[e.type];
           score += edef.score;
+          registerKill();
           addFloater(e.x, e.y - 20, 'CLONED OUT!', '#66ccff');
           addBurst(e.x, e.y, '#66ccff');
           enemies.splice(j, 1);
@@ -702,8 +786,29 @@
     }
 
     // fairy sparkle: purely visual, just runs its course and switches off
-    if (sparkleActive && performance.now() - sparkleStartTime >= SPARKLE_DURATION) {
+    if (sparkleActive && performance.now() - sparkleStartTime >= sparkleDuration) {
       sparkleActive = false;
+    }
+
+    // Sam: once unlocked he sticks around on the porch for the rest of the game,
+    // lobbing a bit of candy into a random lane every few seconds
+    if (sidekickActive) {
+      sidekickTimer += dt;
+      if (sidekickTimer >= SIDEKICK_THROW_INTERVAL) {
+        sidekickTimer = 0;
+        const lane = Math.floor(Math.random() * 3);
+        projectiles.push({ x: SIDEKICK_X + 18, y: LANES[lane], lane, weapon: 'candy' });
+        addBurst(SIDEKICK_X, LANES[lane], '#66ccff');
+      }
+    }
+
+    // day/night cycle: once it's fully dark, the sky puts on a little fireworks show
+    if (getDayProgress() >= 0.85) {
+      fireworksTimer -= dt;
+      if (fireworksTimer <= 0) {
+        spawnFirework();
+        fireworksTimer = 1400 + Math.random() * 1200;
+      }
     }
 
     for (let i = hailstones.length - 1; i >= 0; i--) {
@@ -717,6 +822,7 @@
           if (e.lane === hs.lane && Math.abs(e.x - hs.x) < 38) {
             const edef = ENEMY_TYPES[e.type];
             score += edef.score;
+            registerKill();
             addFloater(e.x, e.y - 20, 'SPLATTED!', '#7CFC00');
             addBurst(e.x, e.y, '#7CFC00');
             enemies.splice(j, 1);
@@ -737,9 +843,17 @@
       if (pk.lane === player.lane && Math.abs(pk.x - player.x) < 30) {
         const def = ITEM_TYPES[pk.type];
         if (def.instant) {
-          // Fairy Wand: fires the moment she touches it, doesn't sit in her purse
-          if (pk.type === 'fairywand') triggerFairySparkle();
-          addFloater(pk.x, pk.y - 20, 'GOT THE ' + def.name.toUpperCase() + '!', '#ffd166');
+          // Fairy Wand and Sam both fire the moment she touches them, neither sits in her purse
+          if (pk.type === 'fairywand') {
+            triggerFairySparkle();
+            addFloater(pk.x, pk.y - 20, 'GOT THE FAIRY WAND!', '#ffd166');
+          } else if (pk.type === 'sidekick') {
+            sidekickActive = true;
+            sidekickTimer = 0;
+            addFloater(pk.x, pk.y - 20, "SAM'S GOT YOUR BACK!", '#66ccff');
+          } else {
+            addFloater(pk.x, pk.y - 20, 'GOT THE ' + def.name.toUpperCase() + '!', '#ffd166');
+          }
           addBurst(pk.x, pk.y, '#ffd166');
           pickups.splice(i, 1);
           continue;
@@ -810,6 +924,7 @@
       // hit player door
       if (e.x <= DOOR_X) {
         lives--;
+        streak = 0;
         shake = 300;
         addFloater(DOOR_X+20, e.y, 'THEY GOT IN!', '#ff5555');
         addBurst(DOOR_X+20, e.y, '#ff5555');
@@ -842,6 +957,7 @@
           if (!w.pierce) projectiles.splice(j, 1);
           if (e.health <= 0) {
             score += def.score;
+            registerKill();
             const taunt = def.taunts[Math.floor(Math.random()*def.taunts.length)];
             addFloater(e.x, e.y - 20, taunt, '#7CFC00');
             addBurst(e.x, e.y, '#7CFC00');
@@ -898,11 +1014,29 @@
     }
   }
 
+  // bragging-rights high score, kept in localStorage so it survives between visits on the same phone
+  const BEST_KEY = 'defendThePorchBestScore';
+  function getBestScore() {
+    try { return parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) { return 0; }
+  }
+  function saveBestScore(s) {
+    try { localStorage.setItem(BEST_KEY, String(s)); } catch (e) { /* localStorage unavailable — just skip saving */ }
+  }
+  function refreshBestScoreDisplays() {
+    const best = getBestScore();
+    const a = document.getElementById('bestScoreStart');
+    const b = document.getElementById('bestScoreFinal');
+    if (a) a.textContent = 'Best Score: ' + best;
+    if (b) b.textContent = 'Best: ' + best;
+  }
+
   function triggerGameOver() {
     running = false;
     gameOver = true;
+    if (score > getBestScore()) saveBestScore(score);
     document.getElementById('finalScore').textContent = 'Score: ' + score;
     document.getElementById('finalWave').textContent = 'Wave: ' + wave;
+    refreshBestScoreDisplays();
     document.getElementById('overlay').classList.remove('hidden');
     setMobileControlsVisible(false);
   }
@@ -1053,13 +1187,69 @@
     ctx.restore();
   }
 
+  // 0 = full daylight, 1 = fully dark — ramps up smoothly over the first 6 waves
+  // (18000ms per wave, matching the wave-advance timer in update()) then holds at night.
+  function getDayProgress() {
+    // wave/waveTimer aren't set until the first resetGame() call — guard against that so the
+    // idle start-screen frame (rendered continuously behind the overlay, before Defend the
+    // Porch is ever clicked) never computes NaN and paints an invalid canvas fillStyle.
+    const w = wave || 1;
+    const wt = waveTimer || 0;
+    const raw = (w - 1) + Math.min(1, wt / 18000);
+    return Math.max(0, Math.min(1, raw / 6));
+  }
+
+  function lerpColor(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+    const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+    const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+    return 'rgb(' + r + ',' + g + ',' + bl + ')';
+  }
+
+  function spawnFirework() {
+    const fx = DOOR_X + 60 + Math.random() * (W - DOOR_X - 100);
+    const fy = 30 + Math.random() * 110;
+    const color = FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)];
+    const count = 26;
+    for (let i = 0; i < count; i++) {
+      const ang = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+      const spd = 60 + Math.random() * 90;
+      particles.push({
+        x: fx, y: fy,
+        vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+        life: 700 + Math.random() * 400, color
+      });
+    }
+    addFloater(fx, fy - 10, '🎆', '#fff');
+  }
+
   function drawBackground() {
-    // sky
+    // sky: shifts from day to sunset to night as the waves go by
+    const dayT = getDayProgress();
+    const topColor = dayT < 0.5 ? lerpColor('#7ec8e3', '#ff9a56', dayT / 0.5) : lerpColor('#ff9a56', '#0b1030', (dayT - 0.5) / 0.5);
+    const bottomColor = dayT < 0.5 ? lerpColor('#bfe6f5', '#ffd9a0', dayT / 0.5) : lerpColor('#ffd9a0', '#2a2a55', (dayT - 0.5) / 0.5);
     const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#7ec8e3');
-    grad.addColorStop(1, '#bfe6f5');
+    grad.addColorStop(0, topColor);
+    grad.addColorStop(1, bottomColor);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
+
+    // stars fade in as it gets dark
+    if (dayT > 0.35) {
+      const starAlpha = Math.min(1, (dayT - 0.35) / 0.5);
+      ctx.save();
+      const now = performance.now();
+      STARS.forEach(s => {
+        const tw = 0.5 + 0.5 * Math.sin(now / 500 + s.phase);
+        ctx.globalAlpha = starAlpha * tw;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
 
     // hedge border along the top of the garden
     const hedgeH = LANES[0] - LANE_H/2;
@@ -1335,12 +1525,92 @@
     ctx.restore();
   }
 
+  // streak costume unlocks: party hat at wave 3+, sunglasses at wave 5+, wizard hat
+  // (which takes over from the party hat) after 3 real Fairy Wand pickups in one game
+  function drawPartyHat(cx, topY) {
+    ctx.save();
+    ctx.translate(cx, topY);
+    ctx.fillStyle = '#ff6b9d';
+    ctx.beginPath();
+    ctx.moveTo(-10, 0);
+    ctx.lineTo(10, 0);
+    ctx.lineTo(0, -22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-6, -13); ctx.lineTo(2, -13);
+    ctx.moveTo(-3, -6); ctx.lineTo(5, -6);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.arc(0, -22, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawSunglasses(cx, cy) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.ellipse(-7, 0, 6, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(7, 0, 6, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-1, 0); ctx.lineTo(1, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawWizardHat(cx, topY) {
+    ctx.save();
+    ctx.translate(cx, topY);
+    ctx.fillStyle = '#5b3fa0';
+    ctx.beginPath();
+    ctx.moveTo(-14, 4);
+    ctx.lineTo(14, 4);
+    ctx.lineTo(3, -34);
+    ctx.quadraticCurveTo(0, -40, -3, -34);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffd166';
+    [[-6, -2], [3, -14], [-3, -24]].forEach(([sx, sy]) => {
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.fillStyle = '#b28dff';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, 15, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawPlayer() {
     const charging = !!player.chargeState;
+
+    // kill-streak glow — kicks in once a real chain is going, brighter the longer it runs
+    if (!charging && streak >= 5) {
+      const glowStrength = Math.min(1, (streak - 5) / 20);
+      ctx.save();
+      const glow = ctx.createRadialGradient(player.x, player.y, 4, player.x, player.y, 40 + glowStrength * 14);
+      glow.addColorStop(0, 'rgba(255, 209, 102, ' + (0.5 + glowStrength * 0.35) + ')');
+      glow.addColorStop(1, 'rgba(255, 209, 102, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, 40 + glowStrength * 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     ctx.save();
+    const dh = 68;
+    const dw = dh * PLAYER_ASPECT;
     if (PLAYER_SPRITE.complete && PLAYER_SPRITE.naturalWidth > 0) {
-      const dh = 68;
-      const dw = dh * PLAYER_ASPECT;
       if (charging) {
         // flip to face the direction she's sprinting
         ctx.translate(player.x, player.y);
@@ -1363,6 +1633,18 @@
     }
     ctx.restore();
 
+    // costume unlocks, drawn over the top of her head — skipped mid-charge since she's flipped and sprinting
+    if (!charging) {
+      const topY = player.y - dh / 2 + 6;
+      const eyeY = player.y - dh * 0.12;
+      if (fairyWandUsesThisGame >= 3) {
+        drawWizardHat(player.x, topY);
+      } else if (wave >= 3) {
+        drawPartyHat(player.x, topY);
+      }
+      if (wave >= 5) drawSunglasses(player.x, eyeY);
+    }
+
     if (charging) {
       // trailing bin bag she's dragging behind her
       const trailX = player.chargeState === 'out' ? player.x - 34 : player.x + 34;
@@ -1375,6 +1657,16 @@
       ctx.textBaseline = 'middle';
       ctx.fillText(w.emoji, player.x + 32, player.y - 38);
     }
+  }
+
+  // Sam — the secret cosmetic sidekick, once unlocked he just hangs around on the porch
+  function drawSidekick() {
+    if (!sidekickActive) return;
+    const bob = Math.sin(performance.now() / 260) * 3;
+    ctx.font = '30px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🥷', SIDEKICK_X, H / 2 + bob);
   }
 
   function drawEnemies() {
@@ -1508,11 +1800,11 @@
   }
 
   // Fairy Wand payoff: a vibrant color wash pulses over the whole scene while
-  // scattered stars twinkle, both fading out together over SPARKLE_DURATION.
+  // scattered stars twinkle, both fading out together over sparkleDuration.
   function drawFairySparkle() {
     if (!sparkleActive) return;
     const elapsed = performance.now() - sparkleStartTime;
-    const t = elapsed / SPARKLE_DURATION;
+    const t = elapsed / sparkleDuration;
     if (t >= 1) return;
     const envelope = t < 0.08 ? (t / 0.08) : (1 - (t - 0.08) / 0.92);
 
@@ -1557,6 +1849,14 @@
     ctx.strokeText(waveText, 16, 52);
     ctx.fillText(waveText, 16, 52);
 
+    if (streak >= 2) {
+      ctx.fillStyle = streak >= 5 ? '#ffd166' : '#fff';
+      const streakText = '🔥 Streak: ' + streak;
+      ctx.strokeText(streakText, 16, 74);
+      ctx.fillText(streakText, 16, 74);
+      ctx.fillStyle = '#fff';
+    }
+
     let hearts = '';
     for (let i = 0; i < lives; i++) hearts += '❤️';
     ctx.font = '20px serif';
@@ -1600,6 +1900,7 @@
       ctx.translate((Math.random()-0.5)*6, (Math.random()-0.5)*6);
     }
     drawBackground();
+    drawSidekick();
     drawPickups();
     drawEnemies();
     drawHailstones();
@@ -1712,6 +2013,7 @@
   enemies = []; projectiles = []; particles = []; floaters = []; pickups = []; clones = []; hailstones = [];
   score = 0; lives = 3; wave = 1; running = false;
   setMobileControlsVisible(false);
+  refreshBestScoreDisplays();
   requestAnimationFrame(loop);
 })();
 
