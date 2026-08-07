@@ -171,6 +171,32 @@
     color: #402c00;
     cursor: pointer;
   }
+  #musicControls {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 8px;
+    z-index: 11;
+  }
+  #musicControls button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(20, 15, 10, 0.55);
+    color: #fff;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+  }
+  #musicControls button.active {
+    border-color: #ffd166;
+    background: rgba(255, 209, 102, 0.35);
+  }
 </style>
 </head>
 <body>
@@ -190,38 +216,11 @@
     <div id="startHintScroll">
       <h1>🎂 Happy Birthday Deniz 🎂<br>Get Off My Lawn</h1>
       <p id="bestScoreStart" style="color:#ffd166; font-weight:bold; margin:0 0 6px;">Best Score: 0</p>
-      <p>
-        They just keep coming to the door — dogs, cats, the postman, nosy neighbours, delivery
-        drivers, politicians, drones, even a delivery truck. Not today.
-      </p>
-      <p>
-        Move between the 3 walkways with <b>↑ / ↓</b> (or <b>W/S</b>), and shift a step with
-        <b>← / →</b> (or <b>A/D</b>) to reach items beside the porch. On a phone: swipe up/down or
-        left/right, tap to throw, and use the buttons on screen to switch weapons.
-      </p>
-      <p>
-        Pelt intruders with whatever's in your purse using <b>Space</b> or <b>Left Click</b>.
-        Switch weapons with <b>1</b> (Candy), <b>2</b> (Rolling Pin), <b>3</b> (Teacup) — the Teacup
-        and special items slow enemies with a <b>red hue</b>.
-      </p>
-      <p>
-        Watch for <b>✨ sparkly pickups</b>. Small ones are quick and weak; big ones like the
-        Watermelon or Garden Statue hit hard. The <b>Smelly Sock</b> and <b>Frisbee</b> fly through
-        the whole lane, taking out two or more intruders. Grab a <b>Bin Bag</b> and she charges
-        off-screen, flattening her lane. Watch out for the <b>Clone Swarm</b> to destroy all
-        intruders. Find a <b>Mystery Vegetable</b> and unleash a vegetable hailstorm. Grab any item
-        before they disappear and press <b>4</b> to unleash them. Catch a <b>Fairy Wand</b> and the
-        whole scene lights up in a burst of magic, just for fun. A <b>Confetti Cannon</b> won't
-        hurt anyone, but it'll freeze every intruder in a burst of glitter for a moment.
-      </p>
-      <p>
-        Chain kills without letting anyone through and Deniz starts to glow — the longer the
-        streak, the faster she throws, with a bonus sparkle every 10 kills.
-      </p>
-      <p>
-        Get caught next to an enemy while out of position and you'll be startled back to the porch!
-        Don't let anyone reach the door!
-      </p>
+      <p>Everyone's coming to the door. Not today. 🚪</p>
+      <p><b>Move</b> ↑↓←→ (swipe) · <b>Throw</b> Space/Click (tap) · <b>Switch</b> 1-4 (buttons)</p>
+      <p>✨ <b>Grab pickups</b> for chaos — Bin Bag charges, Clone Swarm multiplies her, Mystery
+        Veg rains hail, Confetti Cannon blinds, Fairy Wand sparkles, Garden Gnome bonks hard.</p>
+      <p>Chain kills to make her <b>glow</b> and throw faster. Don't let anyone reach the door!</p>
     </div>
     <button id="startBtn">Defend the Porch</button>
   </div>
@@ -231,6 +230,10 @@
     <p id="finalWave">Wave: 1</p>
     <p id="bestScoreFinal" style="color:#ffd166; font-weight:bold;">Best: 0</p>
     <button id="restartBtn">Try Again</button>
+  </div>
+  <div id="musicControls">
+    <button id="musicToggleBtn" title="Play/stop music">🎵</button>
+    <button id="musicRegenBtn" title="Regenerate the tune">🔀</button>
   </div>
 </div>
 <script>
@@ -282,7 +285,7 @@
     tp:      { name: 'Toilet Paper',  emoji: '🧻', size: 'medium', cooldown: 380, speed: 400, damage: 2,  knockback: 0,   stun: 2200, slowFactor: 0.7, uses: 3, weight: 3 },
     pie:     { name: 'Hot Pie',       emoji: '🥧', size: 'medium', cooldown: 550, speed: 340, damage: 7,  knockback: 20,  stun: 600,  slowFactor: 0.5, uses: 2, weight: 3 },
     melon:   { name: 'Watermelon',    emoji: '🍉', size: 'large',  cooldown: 900, speed: 300, damage: 16, knockback: 90,  stun: 0,    uses: 1, weight: 1 },
-    statue:  { name: 'Garden Statue', emoji: '🗿', size: 'large',  cooldown: 1000, speed: 280, damage: 22, knockback: 110, stun: 400,  slowFactor: 0.3, uses: 1, weight: 1 },
+    statue:  { name: 'Garden Gnome', emoji: '🎅', size: 'large',  cooldown: 1000, speed: 280, damage: 22, knockback: 110, stun: 400,  slowFactor: 0.3, uses: 1, weight: 1 },
     frisbee: { name: 'Frisbee',       emoji: '🥏', size: 'medium', cooldown: 450, speed: 440, damage: 6,  knockback: 60,  stun: 0,    uses: 2, weight: 2, pierce: true },
     veggiestorm: { name: 'Mystery Vegetable', emoji: '🥕', size: 'medium', cooldown: 500, damage: 0, knockback: 0, stun: 0, uses: 1, weight: 3, special: 'hailstorm' },
     // special: 'confetti' — no damage at all, just freezes every enemy currently on screen in a burst of confetti.
@@ -397,7 +400,7 @@
     }
   };
 
-  let player, projectiles, enemies, particles, floaters, pickups, clones, hailstones;
+  let player, projectiles, enemies, particles, floaters, pickups, clones, hailstones, deathPoofs;
   let score, lives, wave, spawnTimer, spawnInterval, waveTimer, lastTime, running, gameOver;
   let keys = {};
   let currentWeaponIdx = 0;
@@ -409,6 +412,13 @@
   let lastShot = 0;
   let shake = 0;
   let throwLockUntil = 0;
+  let throwRecoilUntil = 0;
+  let playerFlinchUntil = 0;
+  const THROW_RECOIL_DURATION = 160;
+  const FLINCH_DURATION = 380;
+  let waveBannerText = '';
+  let waveBannerStart = -99999;
+  const WAVE_BANNER_DURATION = 2200;
   let hailstormActive = false;
   let hailstormEndTime = 0;
   let hailstormSpawnTimer = 0;
@@ -447,6 +457,7 @@
     pickups = [];
     clones = [];
     hailstones = [];
+    deathPoofs = [];
     score = 0;
     lives = 3;
     wave = 1;
@@ -462,6 +473,10 @@
     lastShot = 0;
     shake = 0;
     throwLockUntil = 0;
+    throwRecoilUntil = 0;
+    playerFlinchUntil = 0;
+    waveBannerText = '';
+    waveBannerStart = -99999;
     hailstormActive = false;
     hailstormEndTime = 0;
     hailstormSpawnTimer = 0;
@@ -507,7 +522,8 @@
       speed: def.speed * (1 + (wave - 1) * 0.05),
       baseSpeed: def.speed * (1 + (wave - 1) * 0.05),
       stunTimer: 0, slowFactor: 1, monologueTimer: def.monologue ? 2500 + Math.random()*1500 : -1,
-      monologuing: false, bob: Math.random() * Math.PI * 2, touchedPlayer: false
+      monologuing: false, bob: Math.random() * Math.PI * 2, touchedPlayer: false,
+      spawnTime: performance.now()
     };
     if (def.diagonal) {
       // crafty: picks a different lane to drift toward instead of walking a straight line
@@ -595,7 +611,7 @@
     enemies.forEach(e => {
       e.stunTimer = Math.max(e.stunTimer, 3200);
       e.slowFactor = 1;
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < 72; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = 40 + Math.random() * 220;
         particles.push({
@@ -608,7 +624,7 @@
       }
     });
     // the cannon itself, fanning a wide blast out from the porch across the lawn
-    for (let i = 0; i < 55; i++) {
+    for (let i = 0; i < 165; i++) {
       const ang = -0.65 + Math.random() * 1.3;
       const spd = 220 + Math.random() * 260;
       particles.push({
@@ -668,6 +684,7 @@
     const effCooldown = w.cooldown * comboCooldownMultiplier();
     if (!w.special && now - lastShot < effCooldown) return;
     lastShot = now;
+    throwRecoilUntil = now + THROW_RECOIL_DURATION;
 
     if (w.special === 'charge') {
       triggerBinBagCharge();
@@ -707,6 +724,13 @@
     }
   }
 
+  // a quick expanding-ring "poof" wherever an enemy is taken out, instead of them
+  // just instantly blinking out of existence
+  const DEATH_POOF_DURATION = 280;
+  function spawnDeathPoof(x, y) {
+    deathPoofs.push({ x, y, age: 0 });
+  }
+
   // combo/streak: every kill (from any source) extends it, letting an enemy reach the
   // door resets it. A running streak throws faster and makes her glow; every 10 kills
   // fires a free mini sparkle as a reward.
@@ -731,6 +755,7 @@
           registerKill();
           addFloater(e.x, e.y - 20, 'FLATTENED!', '#ff6666');
           addBurst(e.x, e.y, '#ffaa33');
+          spawnDeathPoof(e.x, e.y);
           enemies.splice(i, 1);
         }
       }
@@ -788,6 +813,7 @@
           registerKill();
           addFloater(e.x, e.y - 20, 'CLONED OUT!', '#66ccff');
           addBurst(e.x, e.y, '#66ccff');
+          spawnDeathPoof(e.x, e.y);
           enemies.splice(j, 1);
         }
       }
@@ -841,6 +867,7 @@
             registerKill();
             addFloater(e.x, e.y - 20, 'SLICED!', '#66ccff');
             addBurst(e.x, e.y, '#66ccff');
+            spawnDeathPoof(e.x, e.y);
             enemies.splice(j, 1);
             sw.state = 'return';
             break;
@@ -883,6 +910,7 @@
             registerKill();
             addFloater(e.x, e.y - 20, 'SPLATTED!', '#7CFC00');
             addBurst(e.x, e.y, '#7CFC00');
+            spawnDeathPoof(e.x, e.y);
             enemies.splice(j, 1);
           }
         }
@@ -969,11 +997,22 @@
         e.y = LANES[e.lane] + Math.sin(e.bob) * (e.type === 'drone' ? 10 : 3);
       }
 
+      // the truck trails a little puff of exhaust as it drives up
+      if (e.type === 'truck' && Math.random() < dt / 260) {
+        particles.push({
+          x: e.x + 22, y: e.y + 10,
+          vx: 30 + Math.random() * 20, vy: -20 - Math.random() * 20,
+          life: 500 + Math.random() * 300,
+          color: 'rgba(120,120,120,0.55)'
+        });
+      }
+
       // caught out on the lawn — startles her back to the porch, no life lost (she's unstoppable mid-charge)
       if (!player.chargeState && !e.touchedPlayer && e.lane === player.lane && e.x <= player.x + 28) {
         e.touchedPlayer = true;
         shake = 250;
         throwLockUntil = performance.now() + 600;
+        playerFlinchUntil = performance.now() + FLINCH_DURATION;
         addFloater(player.x, player.y - 34, 'YIKES!', '#ff8888');
         addBurst(player.x, player.y, '#ff8888');
         player.x = PLAYER_X_MIN;
@@ -1019,6 +1058,7 @@
             const taunt = def.taunts[Math.floor(Math.random()*def.taunts.length)];
             addFloater(e.x, e.y - 20, taunt, '#7CFC00');
             addBurst(e.x, e.y, '#7CFC00');
+            spawnDeathPoof(e.x, e.y);
             enemies.splice(i, 1);
           } else if (w.pierce) {
             addFloater(e.x, e.y - 20, 'RETREAT!', '#9ACD32');
@@ -1033,6 +1073,12 @@
       const pt = particles[i];
       pt.x += pt.vx*dt/1000; pt.y += pt.vy*dt/1000; pt.life -= dt;
       if (pt.life <= 0) particles.splice(i, 1);
+    }
+    // death poofs
+    for (let i = deathPoofs.length - 1; i >= 0; i--) {
+      const dp = deathPoofs[i];
+      dp.age += dt;
+      if (dp.age >= DEATH_POOF_DURATION) deathPoofs.splice(i, 1);
     }
     // floaters
     for (let i = floaters.length - 1; i >= 0; i--) {
@@ -1069,6 +1115,8 @@
       wave++;
       spawnInterval = Math.max(550, spawnInterval - 180);
       pickupInterval = Math.max(3200, pickupInterval - 350);
+      waveBannerText = 'WAVE ' + wave + '!';
+      waveBannerStart = performance.now();
     }
   }
 
@@ -1109,6 +1157,8 @@
   function drawTree(cx, baseY, scale) {
     ctx.save();
     ctx.translate(cx, baseY);
+    // gentle wind sway, gently offset per-tree (by position) so they don't all sway in lockstep
+    ctx.rotate(Math.sin(performance.now() / 3600 + cx * 0.3) * 0.035);
     ctx.scale(scale, scale);
     ctx.fillStyle = '#6b4423';
     ctx.fillRect(-3, 0, 6, 12);
@@ -1229,13 +1279,110 @@
     ctx.restore();
   }
 
+  // Garden Gnome — used both for the pickup sitting on the lawn and the thrown
+  // projectile. wobble is a rotation angle (radians) that makes it look like it's
+  // toddling/waddling rather than flying in a straight rigid line.
+  function drawGardenGnome(cx, cy, h, wobble) {
+    const s = h / 38;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (wobble) ctx.rotate(wobble);
+    ctx.scale(s, s);
+
+    // boots
+    ctx.fillStyle = '#3e2712';
+    ctx.beginPath();
+    ctx.ellipse(-5, 15, 4, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(5, 15, 4, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // body (jacket)
+    ctx.fillStyle = '#3a6ea5';
+    ctx.beginPath();
+    ctx.moveTo(-9, 14);
+    ctx.lineTo(9, 14);
+    ctx.lineTo(7, -2);
+    ctx.lineTo(-7, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#5c3a1a';
+    ctx.fillRect(-9, 8, 18, 3);
+
+    // face + beard
+    ctx.fillStyle = '#f0c9a0';
+    ctx.beginPath();
+    ctx.arc(0, -8, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f5f5f5';
+    ctx.beginPath();
+    ctx.moveTo(-6, -6);
+    ctx.lineTo(6, -6);
+    ctx.lineTo(0, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#e0a87a';
+    ctx.beginPath();
+    ctx.arc(0, -8, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // pointy hat
+    ctx.fillStyle = '#d6273c';
+    ctx.beginPath();
+    ctx.moveTo(-9, -12);
+    ctx.lineTo(9, -12);
+    ctx.lineTo(0, -30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(0, -30, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // gives a flat photo-cutout head a subtle rounded, lit look: a soft contact
+  // shadow underneath, then a diagonal light-to-shadow gradient and a small
+  // glossy highlight composited with 'source-atop' so the shading is confined
+  // exactly to the cutout's own silhouette (no need to know its outline).
+  function drawHeadWithDepth(img, dx, dy, dw, dh) {
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(dx + dw / 2 + dw * 0.05, dy + dh * 0.95, dw * 0.36, dh * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.drawImage(img, dx, dy, dw, dh);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    const grad = ctx.createLinearGradient(dx, dy, dx + dw * 0.75, dy + dh * 0.9);
+    grad.addColorStop(0, 'rgba(255,255,255,0.3)');
+    grad.addColorStop(0.45, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.75, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.26)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(dx, dy, dw, dh);
+
+    const shine = ctx.createRadialGradient(dx + dw * 0.32, dy + dh * 0.28, 1, dx + dw * 0.32, dy + dh * 0.28, dw * 0.35);
+    shine.addColorStop(0, 'rgba(255,255,255,0.26)');
+    shine.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = shine;
+    ctx.fillRect(dx, dy, dw, dh);
+    ctx.restore();
+  }
+
   // draws a copy of her head — used for the Clone Swarm pickup, the clones themselves, and the HUD icon
   function drawPlayerHeadIcon(cx, cy, h, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha !== undefined ? alpha : 1;
     if (PLAYER_SPRITE.complete && PLAYER_SPRITE.naturalWidth > 0) {
       const w = h * PLAYER_ASPECT;
-      ctx.drawImage(PLAYER_SPRITE, cx - w/2, cy - h/2, w, h);
+      drawHeadWithDepth(PLAYER_SPRITE, cx - w/2, cy - h/2, w, h);
     } else {
       ctx.font = h + 'px serif';
       ctx.textAlign = 'center';
@@ -1386,6 +1533,40 @@
     ctx.closePath();
     ctx.fill();
 
+    // icing droplets slowly forming and dripping off the roofline, each on its own cycle
+    const animNow = performance.now();
+    [14, 34, 54].forEach((dx, i) => {
+      if (dx > DOOR_X - 6) return;
+      const cycle = 2600;
+      const t = ((animNow + i * 900) % cycle) / cycle;
+      const dripLen = t < 0.75 ? (t / 0.75) * 9 : 0;
+      if (dripLen > 0.5) {
+        ctx.fillStyle = '#fff6e8';
+        ctx.beginPath();
+        ctx.ellipse(dx, 13 + dripLen, 2, 2 + dripLen * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
+    // a little chimney puffing soft smoke that drifts up and off the top of the scene
+    const chimX = DOOR_X - 24;
+    ctx.fillStyle = '#5c3a1a';
+    ctx.fillRect(chimX - 5, 0, 10, 16);
+    ctx.fillStyle = '#4a2f14';
+    ctx.fillRect(chimX - 6, -2, 12, 4);
+    for (let i = 0; i < 3; i++) {
+      const cycle = 2200;
+      const t = ((animNow + i * 700) % cycle) / cycle;
+      const sy = -2 - t * 30;
+      const sx = chimX + Math.sin(t * Math.PI * 2 + i) * 4;
+      ctx.globalAlpha = (1 - t) * 0.4;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3 + t * 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
     // candy-cane striped door — the real entry threshold, full height along the right edge
     const doorX = DOOR_X - 13;
     ctx.save();
@@ -1481,6 +1662,23 @@
     ctx.beginPath();
     ctx.arc(dX + dW - 4, dY + dH - 12, 1.8, 0, Math.PI * 2);
     ctx.fill();
+
+    // a little wreath hanging above the mini door, swinging gently like it's caught in a breeze
+    ctx.save();
+    ctx.translate(dX + dW / 2, dY - 3);
+    ctx.rotate(Math.sin(animNow / 1800) * 0.18);
+    ctx.strokeStyle = '#3f7a3f';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.arc(0, 7, 5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#d64550';
+    [[0, 2], [4.5, 7], [-4.5, 7], [0, 12]].forEach(([bx, by]) => {
+      ctx.beginPath();
+      ctx.arc(bx, by, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
 
     // candy canes and lollipops standing where flower pots would be
     drawCandyCane(9, H - 22);
@@ -1650,6 +1848,7 @@
 
   function drawPlayer() {
     const charging = !!player.chargeState;
+    const now = performance.now();
 
     // kill-streak glow — kicks in once a real chain is going, brighter the longer it runs
     if (!charging && streak >= 5) {
@@ -1665,43 +1864,50 @@
       ctx.restore();
     }
 
-    ctx.save();
     const dh = 68;
     const dw = dh * PLAYER_ASPECT;
+
+    // idle sway + a quick recoil kick right after throwing + a startled wobble when
+    // she's just been caught out of position — all just gentle rotation, layered together
+    let playerRotation = Math.sin(now / 1400) * 0.035;
+    if (now < throwRecoilUntil) {
+      const rt = Math.min(1, 1 - (throwRecoilUntil - now) / THROW_RECOIL_DURATION);
+      playerRotation += Math.sin(rt * Math.PI) * -0.14;
+    }
+    if (now < playerFlinchUntil) {
+      const remain = (playerFlinchUntil - now) / FLINCH_DURATION;
+      playerRotation += Math.sin(now / 26) * 0.16 * remain;
+    }
+
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    if (charging) {
+      // flip to face the direction she's sprinting
+      if (player.chargeState === 'out') ctx.scale(-1, 1);
+    } else {
+      ctx.rotate(playerRotation);
+    }
     if (PLAYER_SPRITE.complete && PLAYER_SPRITE.naturalWidth > 0) {
-      if (charging) {
-        // flip to face the direction she's sprinting
-        ctx.translate(player.x, player.y);
-        if (player.chargeState === 'out') ctx.scale(-1, 1);
-        ctx.drawImage(PLAYER_SPRITE, -dw/2, -dh/2, dw, dh);
-      } else {
-        ctx.drawImage(PLAYER_SPRITE, player.x - dw/2, player.y - dh/2, dw, dh);
-      }
+      drawHeadWithDepth(PLAYER_SPRITE, -dw/2, -dh/2, dw, dh);
     } else {
       ctx.font = '46px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      if (charging && player.chargeState === 'out') {
-        ctx.translate(player.x, player.y);
-        ctx.scale(-1, 1);
-        ctx.fillText('👵', 0, 0);
-      } else {
-        ctx.fillText('👵', player.x, player.y);
+      ctx.fillText('👵', 0, 0);
+    }
+    // costume unlocks, drawn over the top of her head — travel with the same sway/recoil/flinch.
+    // skipped mid-charge since she's flipped and sprinting.
+    if (!charging) {
+      const topY = -dh / 2 + 6;
+      const eyeY = -dh * 0.12;
+      if (fairyWandUsesThisGame >= 3) {
+        drawWizardHat(0, topY);
+      } else if (wave >= 3) {
+        drawPartyHat(0, topY);
       }
+      if (wave >= 5) drawSunglasses(0, eyeY);
     }
     ctx.restore();
-
-    // costume unlocks, drawn over the top of her head — skipped mid-charge since she's flipped and sprinting
-    if (!charging) {
-      const topY = player.y - dh / 2 + 6;
-      const eyeY = player.y - dh * 0.12;
-      if (fairyWandUsesThisGame >= 3) {
-        drawWizardHat(player.x, topY);
-      } else if (wave >= 3) {
-        drawPartyHat(player.x, topY);
-      }
-      if (wave >= 5) drawSunglasses(player.x, eyeY);
-    }
 
     if (charging) {
       // trailing bin bag she's dragging behind her
@@ -1742,7 +1948,10 @@
     }
   }
 
+  const SPAWN_POP_DURATION = 240;
+
   function drawEnemies() {
+    const now = performance.now();
     for (const e of enemies) {
       const def = ENEMY_TYPES[e.type];
 
@@ -1757,7 +1966,20 @@
         ctx.restore();
       }
 
+      // spawn pop-in: scales up from small with a little overshoot bounce
+      const spawnAge = now - (e.spawnTime || 0);
+      let popScale = 1;
+      if (spawnAge < SPAWN_POP_DURATION) {
+        const t = spawnAge / SPAWN_POP_DURATION;
+        popScale = t < 0.7 ? (t / 0.7) * 1.15 : 1.15 - ((t - 0.7) / 0.3) * 0.15;
+      }
+      // walking wobble — a light side-to-side rock synced to her step rhythm
+      const walkWobble = Math.sin(e.bob * 1.2) * 0.1;
+
       ctx.save();
+      ctx.translate(e.x, e.y);
+      ctx.rotate(walkWobble);
+      ctx.scale(popScale, popScale);
       if (e.stunTimer > 0) {
         ctx.filter = 'sepia(1) saturate(6) hue-rotate(-40deg)';
       }
@@ -1766,19 +1988,60 @@
         if (head && head.img.complete && head.img.naturalWidth > 0) {
           const dh = 48;
           const dw = dh * head.aspect;
-          ctx.drawImage(head.img, e.x - dw/2, e.y - dh/2, dw, dh);
+          drawHeadWithDepth(head.img, -dw/2, -dh/2, dw, dh);
         } else {
           ctx.font = '38px serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText('👤', e.x, e.y);
+          ctx.fillText('👤', 0, 0);
         }
       } else {
         ctx.font = '38px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(def.emoji, e.x, e.y);
+        ctx.fillText(def.emoji, 0, 0);
       }
+      ctx.filter = 'none';
+
+      // little type-specific touches
+      if (e.type === 'drone') {
+        ctx.save();
+        ctx.translate(0, -20);
+        ctx.rotate((now / 35) % (Math.PI * 2));
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-9, 0); ctx.lineTo(9, 0);
+        ctx.moveTo(0, -9); ctx.lineTo(0, 9);
+        ctx.stroke();
+        ctx.restore();
+      } else if (e.type === 'dog' || e.type === 'cat') {
+        ctx.save();
+        ctx.translate(16, 6);
+        ctx.rotate(Math.sin(now / 220) * 0.5);
+        ctx.strokeStyle = '#7a4a24';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(10, -6);
+        ctx.stroke();
+        ctx.restore();
+      } else if ((e.type === 'politician' || e.type === 'neighbour') && e.monologuing) {
+        ctx.strokeStyle = '#3e2712';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        const armWave = Math.sin(now / 180);
+        ctx.beginPath();
+        ctx.moveTo(-16, 4);
+        ctx.lineTo(-24, 4 - armWave * 10);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(16, 4);
+        ctx.lineTo(24, 4 + armWave * 10);
+        ctx.stroke();
+      }
+
       ctx.restore();
 
       // health bar
@@ -1803,6 +2066,11 @@
     for (const p of projectiles) {
       const w = ALL_WEAPONS[p.weapon];
       const px = SIZE_PX[w.size || 'medium'];
+      if (p.weapon === 'statue') {
+        // the Garden Gnome toddles/waddles as he flies instead of sailing in a rigid line
+        drawGardenGnome(p.x, p.y, px, Math.sin(p.x / 22) * 0.4);
+        continue;
+      }
       ctx.font = px + 'px serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1825,6 +2093,8 @@
         drawBinBag(pk.x, pk.y, px);
       } else if (pk.type === 'clonehead') {
         drawPlayerHeadIcon(pk.x, pk.y, px);
+      } else if (pk.type === 'statue') {
+        drawGardenGnome(pk.x, pk.y, px, Math.sin(pk.bob * 0.8) * 0.22);
       } else {
         ctx.font = px + 'px serif';
         ctx.fillText(def.emoji, pk.x, pk.y);
@@ -1858,6 +2128,21 @@
       ctx.globalAlpha = Math.max(0, pt.life/400);
       ctx.fillRect(pt.x, pt.y, 4, 4);
       ctx.globalAlpha = 1;
+    }
+  }
+
+  // a quick expanding, fading ring wherever an enemy was just taken out
+  function drawDeathPoofs() {
+    for (const dp of deathPoofs) {
+      const t = dp.age / DEATH_POOF_DURATION;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - t);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3 * (1 - t) + 1;
+      ctx.beginPath();
+      ctx.arc(dp.x, dp.y, 6 + t * 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -1908,6 +2193,37 @@
     ctx.restore();
   }
 
+  // a banner that slides in, holds, then slides out/fades whenever a new wave starts
+  function drawWaveBanner() {
+    const elapsed = performance.now() - waveBannerStart;
+    if (elapsed < 0 || elapsed > WAVE_BANNER_DURATION) return;
+    const slideIn = 300, hold = 1400;
+    const slideOut = WAVE_BANNER_DURATION - slideIn - hold;
+    const bannerY = 120;
+    let y, alpha = 1;
+    if (elapsed < slideIn) {
+      const t = elapsed / slideIn;
+      y = -40 + t * (bannerY + 40);
+    } else if (elapsed < slideIn + hold) {
+      y = bannerY;
+    } else {
+      const t = (elapsed - slideIn - hold) / Math.max(1, slideOut);
+      y = bannerY + t * 40;
+      alpha = 1 - t;
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 42px sans-serif';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+    ctx.strokeText(waveBannerText, W / 2, y);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillText(waveBannerText, W / 2, y);
+    ctx.restore();
+  }
+
   function drawHUD() {
     ctx.textAlign = 'left';
     ctx.font = 'bold 18px sans-serif';
@@ -1915,20 +2231,12 @@
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.lineWidth = 3;
     const scoreText = 'Score: ' + score;
-    ctx.strokeText(scoreText, 16, 28);
-    ctx.fillText(scoreText, 16, 28);
+    ctx.strokeText(scoreText, DOOR_X + 10, 22);
+    ctx.fillText(scoreText, DOOR_X + 10, 22);
 
     const waveText = 'Wave: ' + wave;
-    ctx.strokeText(waveText, 16, 52);
-    ctx.fillText(waveText, 16, 52);
-
-    if (streak >= 2) {
-      ctx.fillStyle = streak >= 5 ? '#ffd166' : '#fff';
-      const streakText = '🔥 Streak: ' + streak;
-      ctx.strokeText(streakText, 16, 74);
-      ctx.fillText(streakText, 16, 74);
-      ctx.fillStyle = '#fff';
-    }
+    ctx.strokeText(waveText, DOOR_X + 10, 46);
+    ctx.fillText(waveText, DOOR_X + 10, 46);
 
     let hearts = '';
     for (let i = 0; i < lives; i++) hearts += '❤️';
@@ -1982,8 +2290,10 @@
     drawNinjaSwords();
     drawPlayer();
     drawParticles();
+    drawDeathPoofs();
     drawFloaters();
     drawHUD();
+    drawWaveBanner();
     drawFairySparkle();
     ctx.restore();
   }
@@ -2084,7 +2394,7 @@
 
   // idle state before start
   player = { lane: 1, y: LANES[1], targetY: LANES[1], x: PLAYER_X_MIN, chargeState: null, chargeHit: null };
-  enemies = []; projectiles = []; particles = []; floaters = []; pickups = []; clones = []; hailstones = [];
+  enemies = []; projectiles = []; particles = []; floaters = []; pickups = []; clones = []; hailstones = []; deathPoofs = [];
   score = 0; lives = 3; wave = 1; running = false;
   setMobileControlsVisible(false);
   refreshBestScoreDisplays();
@@ -2097,6 +2407,548 @@ window.addEventListener('orientationchange', () => {
   void document.body.offsetHeight; // force a reflow
   document.body.style.display = '';
 });
+</script>
+<script>
+(function () {
+  'use strict';
+
+  // ===================================================================
+  // Procedural score: cheerful, whimsical, Danny Elfman / Plants vs.
+  // Zombies-style music, fully synthesized with the Web Audio API.
+  // No samples, no external libraries. Generated fresh every time it
+  // plays and never repeats identically, but stays musically coherent:
+  // one fixed key (D harmonic minor), one tempo, a small pool of chord
+  // progressions, a steady felt beat at all times, and three
+  // interchangeable "sections" the piece wanders between every 16-32
+  // bars. Every voice is kept inside a comfortable, gentle register —
+  // nothing piercing, nothing rumbling too low.
+  // ===================================================================
+
+  const TEMPO = 128; // bpm, within the requested 120-140 range
+  const ROOT_MIDI = 50; // D3
+  const SCALE = [0, 2, 3, 5, 7, 8, 11]; // D harmonic minor, semitones from root
+
+  function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  function clampFreq(f, lo, hi) { return Math.max(lo, Math.min(hi, f)); }
+
+  function scaleFreq(pos, octaveShift) {
+    octaveShift = octaveShift || 0;
+    const len = SCALE.length;
+    const oct = Math.floor(pos / len);
+    const deg = ((pos % len) + len) % len;
+    return midiToFreq(ROOT_MIDI + (oct + octaveShift) * 12 + SCALE[deg]);
+  }
+
+  // chords as explicit semitone offsets from the root, chosen for a
+  // playful, major-leaning color even inside the minor scale
+  const CHORD_POOL = {
+    i:   { tones: [0, 3, 7] },       // D minor  (tonic)
+    III: { tones: [3, 7, 10] },      // F major  (borrowed, bright)
+    iv:  { tones: [5, 8, 12] },      // G minor
+    V:   { tones: [7, 11, 14] },     // A major  (from the raised 7th)
+    V7:  { tones: [7, 11, 14, 17] }, // A7       (a little spooky-fun tension)
+    VI:  { tones: [8, 12, 15] }      // Bb major
+  };
+  // every progression starts and ends on something that resolves cleanly,
+  // so section transitions always land somewhere sensible
+  const PROGRESSIONS = [
+    ['i', 'VI', 'III', 'V'],
+    ['i', 'iv', 'V', 'i'],
+    ['VI', 'V', 'i', 'i'],
+    ['i', 'V7', 'VI', 'iv'],
+    ['III', 'iv', 'V', 'i']
+  ];
+
+  function chordFreq(chord, idx, octaveShift) {
+    octaveShift = octaveShift || 0;
+    const semis = chord.tones[idx % chord.tones.length];
+    return midiToFreq(ROOT_MIDI + semis + 12 * octaveShift);
+  }
+
+  function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pickProgression() { return PROGRESSIONS[Math.floor(Math.random() * PROGRESSIONS.length)]; }
+  function pickNextSection(cur) {
+    const options = [1, 2, 3].filter(function (s) { return s !== cur; });
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  // a gentle, mean-zero weighted-random walk: small steps are common,
+  // occasional bigger leaps keep the tune from getting too predictable,
+  // and it's symmetric so it doesn't quietly drift off into the distance
+  const WALK_STEPS = [-3, -2, -2, -1, -1, -1, 0, 0, 1, 1, 1, 2, 2, 3];
+  function walkMelody(pos) {
+    let next = pos + WALK_STEPS[Math.floor(Math.random() * WALK_STEPS.length)];
+    // keep the walk within about an octave and a half of home — a soft
+    // nudge back toward center rather than a hard wall, so it never
+    // wanders into a register that sounds out of place
+    if (next > 9) next -= 3;
+    if (next < -6) next += 3;
+    return next;
+  }
+
+  // ---------------- audio graph (created lazily, on first play) ----------------
+  let audioCtx = null;
+  let masterGain = null, compressor = null, reverbNode = null;
+  let stringsBus, marimbaBus, harpsiBus, organBus, pianoBus, bassBus, drumBus, chipBus;
+  let noiseBuffer = null;
+
+  function createNoiseBuffer() {
+    const len = audioCtx.sampleRate * 1;
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  // a short, soft synthetic room tone (decaying filtered noise) — glues
+  // the instruments together and takes the edge off raw synth tones
+  function createImpulseResponse() {
+    const len = Math.round(audioCtx.sampleRate * 1.1);
+    const impulse = audioCtx.createBuffer(2, len, audioCtx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+      }
+    }
+    return impulse;
+  }
+
+  function makeBus(vol) {
+    const g = audioCtx.createGain();
+    g.gain.value = vol;
+    g.connect(masterGain);
+    if (reverbNode) g.connect(reverbNode);
+    return g;
+  }
+
+  function initAudioGraph() {
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0;
+
+    compressor = audioCtx.createDynamicsCompressor();
+    if (compressor.threshold) compressor.threshold.value = -14;
+    if (compressor.knee) compressor.knee.value = 24;
+    if (compressor.ratio) compressor.ratio.value = 3;
+    if (compressor.attack) compressor.attack.value = 0.02;
+    if (compressor.release) compressor.release.value = 0.3;
+    masterGain.connect(compressor);
+    compressor.connect(audioCtx.destination);
+
+    // gentle reverb send, mixed in quietly for warmth rather than "wet" ambience
+    reverbNode = audioCtx.createConvolver();
+    reverbNode.buffer = createImpulseResponse();
+    const reverbSend = audioCtx.createGain();
+    reverbSend.gain.value = 0.16;
+    reverbNode.connect(reverbSend);
+    reverbSend.connect(masterGain);
+
+    stringsBus = makeBus(0.7);
+    marimbaBus = makeBus(0.62);
+    harpsiBus  = makeBus(0.42);
+    organBus   = makeBus(0.4);
+    pianoBus   = makeBus(0.6);
+    bassBus    = makeBus(0.68);
+    drumBus    = makeBus(0.48);
+    chipBus    = makeBus(0.34);
+
+    noiseBuffer = createNoiseBuffer();
+  }
+
+  // ---------------- instrument voices ----------------
+  // Every voice is a short-lived oscillator/noise graph with its own
+  // gentle envelope; nothing is ever reused between notes. Frequencies
+  // are always passed through clampFreq() at the call site so nothing
+  // can ever wander into a piercing or rumbling register.
+
+  function playPizzicato(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 1600;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.45, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.09, Math.min(dur, 0.26)));
+    osc.connect(filt); filt.connect(g); g.connect(stringsBus);
+    osc.start(t); osc.stop(t + 0.3);
+  }
+
+  function playMarimba(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * 1.015, t);
+    osc.frequency.exponentialRampToValueAtTime(freq, t + 0.045);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.55, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.12, Math.min(dur, 0.4)));
+    osc.connect(g); g.connect(marimbaBus);
+    osc.start(t); osc.stop(t + 0.45);
+
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 3;
+    const g2 = audioCtx.createGain();
+    g2.gain.setValueAtTime(0, t);
+    g2.gain.linearRampToValueAtTime(vel * 0.1, t + 0.003);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc2.connect(g2); g2.connect(marimbaBus);
+    osc2.start(t); osc2.stop(t + 0.1);
+  }
+
+  function playHarpsichord(t, freq, dur, vel) {
+    const g = audioCtx.createGain();
+    g.gain.value = vel * 0.28;
+    g.connect(harpsiBus);
+    const partials = [1, 3];
+    partials.forEach(function (p, idx) {
+      const osc = audioCtx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = freq * p;
+      const og = audioCtx.createGain();
+      const amt = idx === 0 ? 1 : 0.22;
+      og.gain.setValueAtTime(0, t);
+      og.gain.linearRampToValueAtTime(amt, t + 0.003);
+      og.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.1, Math.min(dur, 0.32)));
+      osc.connect(og); og.connect(g);
+      osc.start(t); osc.stop(t + 0.4);
+    });
+  }
+
+  function playOrgan(t, freq, dur, vel) {
+    const osc1 = audioCtx.createOscillator(); osc1.type = 'triangle'; osc1.frequency.value = freq;
+    const osc2 = audioCtx.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = freq * 2;
+    const g2 = audioCtx.createGain(); g2.gain.value = 0.35;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.setValueAtTime(500, t);
+    filt.frequency.linearRampToValueAtTime(1300, t + dur * 0.6);
+    filt.frequency.linearRampToValueAtTime(700, t + dur);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.16, t + 0.18);
+    g.gain.setValueAtTime(vel * 0.16, t + Math.max(0.2, dur - 0.18));
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    osc1.connect(filt); osc2.connect(g2); g2.connect(filt);
+    filt.connect(g); g.connect(organBus);
+    osc1.start(t); osc1.stop(t + dur + 0.05);
+    osc2.start(t); osc2.stop(t + dur + 0.05);
+  }
+
+  function playPiano(t, freq, dur, vel) {
+    const osc1 = audioCtx.createOscillator(); osc1.type = 'triangle'; osc1.frequency.value = freq;
+    const osc2 = audioCtx.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = freq * 2;
+    const g2 = audioCtx.createGain(); g2.gain.value = 0.22;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.35, t + 0.007);
+    g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.1, Math.min(dur, 0.45)));
+    osc1.connect(g); osc2.connect(g2); g2.connect(g);
+    g.connect(pianoBus);
+    osc1.start(t); osc1.stop(t + 0.55);
+    osc2.start(t); osc2.stop(t + 0.55);
+  }
+
+  function playTuba(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 420;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.4, t + 0.055);
+    g.gain.linearRampToValueAtTime(vel * 0.26, t + Math.max(0.07, dur * 0.7));
+    g.gain.linearRampToValueAtTime(0.001, t + dur);
+    osc.connect(filt); filt.connect(g); g.connect(bassBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+
+  function playSubBass(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 380;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.42, t + 0.02);
+    g.gain.linearRampToValueAtTime(0.001, t + Math.max(0.09, Math.min(dur, 0.3)));
+    osc.connect(filt); filt.connect(g); g.connect(bassBus);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+
+  // a soft, warm downbeat pulse used to anchor the spooky section so it
+  // always has a felt heartbeat, even without literal drums
+  function playSoftPulse(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 500;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel * 0.4, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.001, t + Math.max(0.18, Math.min(dur, 0.55)));
+    osc.connect(filt); filt.connect(g); g.connect(bassBus);
+    osc.start(t); osc.stop(t + 0.6);
+  }
+
+  function playKick(t, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(130, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vel * 0.7, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    osc.connect(g); g.connect(drumBus);
+    osc.start(t); osc.stop(t + 0.18);
+  }
+
+  function playSnare(t, vel) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.value = 1400;
+    filt.Q.value = 0.8;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vel * 0.4, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+    src.connect(filt); filt.connect(g); g.connect(drumBus);
+    const offset = Math.random() * Math.max(0.01, noiseBuffer.duration - 0.05);
+    src.start(t, offset);
+    src.stop(t + 0.13);
+  }
+
+  function playHat(t, vel) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.value = 5200;
+    filt.Q.value = 0.7;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vel * 0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+    src.connect(filt); filt.connect(g); g.connect(drumBus);
+    const offset = Math.random() * Math.max(0.01, noiseBuffer.duration - 0.05);
+    src.start(t, offset);
+    src.stop(t + 0.04);
+  }
+
+  function playChiptune(t, freq, dur, vel) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    const filt = audioCtx.createBiquadFilter();
+    filt.type = 'lowpass';
+    filt.frequency.value = 2600;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vel * 0.16, t);
+    g.gain.setValueAtTime(vel * 0.16, t + Math.max(0.02, dur * 0.6));
+    g.gain.linearRampToValueAtTime(0.001, t + Math.max(0.03, dur * 0.9));
+    osc.connect(filt); filt.connect(g); g.connect(chipBus);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  }
+
+  // ---------------- generative arrangement ----------------
+  let currentSection = 1;      // 1 = spooky, 2 = ragtime, 3 = chiptune
+  let barsInSection = 0;
+  let sectionTargetBars = randInt(16, 32);
+  let currentProgression = pickProgression();
+
+  let marimbaPos = 0, chipPos = 0;
+
+  function regenerateNow() {
+    barsInSection = 0;
+    sectionTargetBars = randInt(16, 32);
+    currentSection = pickNextSection(currentSection);
+    currentProgression = pickProgression();
+  }
+
+  // comfortable, gentle frequency ranges per instrument family — nothing
+  // piercing up top, nothing rumbling too low down below
+  const RANGE_BASS = [65, 175];      // tuba / sub-bass / soft pulse
+  const RANGE_MID  = [140, 420];     // pizzicato / harpsichord / organ / piano
+  const RANGE_LEAD = [220, 780];     // marimba / chiptune melody
+
+  function scheduleSection1(step, time, chord) {
+    const s16 = (60 / TEMPO) / 4;
+    // a soft, warm downbeat so the spooky section always has a felt pulse
+    if (step === 0 || step === 8) {
+      playSoftPulse(time, clampFreq(chordFreq(chord, 0, -1), RANGE_BASS[0], RANGE_BASS[1]), s16 * 3, 0.55);
+    }
+    if (step === 0) {
+      playOrgan(time, clampFreq(chordFreq(chord, 0, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 16 * 0.98, 0.8);
+      playOrgan(time, clampFreq(chordFreq(chord, 2, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 16 * 0.98, 0.55);
+    }
+    if (step % 4 === 0) {
+      const idx = Math.floor(step / 4) % chord.tones.length;
+      const freq = clampFreq(chordFreq(chord, idx, 0), RANGE_MID[0], RANGE_MID[1]);
+      if (Math.random() < 0.5) playPizzicato(time, freq, s16 * 1.4, 0.8);
+      else playHarpsichord(time, freq, s16 * 1.4, 0.75);
+    } else if (step % 4 === 2 && Math.random() < 0.35) {
+      playPizzicato(time, clampFreq(chordFreq(chord, 1, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 1.1, 0.55);
+    }
+    if ((step % 2 === 0) && Math.random() < 0.55) {
+      marimbaPos = walkMelody(marimbaPos);
+      playMarimba(time, clampFreq(scaleFreq(marimbaPos, 1), RANGE_LEAD[0], RANGE_LEAD[1]), s16 * 1.6, 0.65);
+    }
+  }
+
+  function scheduleSection2(step, time, chord) {
+    const s16 = (60 / TEMPO) / 4;
+    const swing = (step % 2 === 1) ? s16 * 0.32 : 0;
+    if (step === 0 || step === 8) {
+      playTuba(time, clampFreq(chordFreq(chord, 0, -1), RANGE_BASS[0], RANGE_BASS[1]), s16 * 3.6, 0.85);
+      playKick(time, 0.8);
+    }
+    if (step === 4 || step === 12) {
+      playSnare(time, 0.75);
+    }
+    if ((step === 6 || step === 14) && Math.random() < 0.4) {
+      playSnare(time, 0.3);
+    }
+    if (step % 4 === 2) {
+      playPiano(time + swing, clampFreq(chordFreq(chord, 0, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 1.2, 0.55);
+      playPiano(time + swing, clampFreq(chordFreq(chord, 1, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 1.2, 0.45);
+      playPiano(time + swing, clampFreq(chordFreq(chord, 2, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 1.2, 0.45);
+    } else if (Math.random() < 0.15) {
+      const idx = Math.floor(Math.random() * chord.tones.length);
+      playPiano(time + swing, clampFreq(chordFreq(chord, idx, 0), RANGE_MID[0], RANGE_MID[1]), s16 * 0.8, 0.35);
+    }
+  }
+
+  function scheduleSection3(step, time, chord) {
+    const s16 = (60 / TEMPO) / 4;
+    // steady quarter-note bass pulse — the "beat" for this section
+    if (step % 4 === 0) {
+      playSubBass(time, clampFreq(chordFreq(chord, 0, -1), RANGE_BASS[0], RANGE_BASS[1]), s16 * 3.6, 0.75);
+    }
+    if (step % 2 === 1) {
+      playHat(time, 0.28);
+    }
+    if (Math.random() < 0.85) {
+      let freq;
+      if (step % 4 === 0) {
+        const idx = Math.floor(Math.random() * chord.tones.length);
+        freq = chordFreq(chord, idx, 1);
+      } else {
+        chipPos = walkMelody(chipPos);
+        freq = scaleFreq(chipPos, 1);
+      }
+      playChiptune(time, clampFreq(freq, RANGE_LEAD[0], RANGE_LEAD[1]), s16 * 0.95, 0.5);
+    }
+  }
+
+  function scheduleStep(step, time, chordIdx) {
+    const chordKey = currentProgression[chordIdx % currentProgression.length];
+    const chord = CHORD_POOL[chordKey];
+    if (currentSection === 1) scheduleSection1(step, time, chord);
+    else if (currentSection === 2) scheduleSection2(step, time, chord);
+    else scheduleSection3(step, time, chord);
+  }
+
+  // ---------------- lookahead scheduler (Web Audio API pattern) ----------------
+  const LOOKAHEAD_MS = 25;
+  const SCHEDULE_AHEAD = 0.12; // seconds
+
+  let currentBar = 0, current16th = 0, chordIndex = 0;
+  let nextNoteTime = 0;
+  let timerID = null;
+  let isPlaying = false;
+
+  function secondsPer16th() { return (60 / TEMPO) / 4; }
+
+  function advanceStep() {
+    nextNoteTime += secondsPer16th();
+    current16th++;
+    if (current16th >= 16) {
+      current16th = 0;
+      currentBar++;
+      barsInSection++;
+      chordIndex = currentBar % currentProgression.length;
+      if (barsInSection >= sectionTargetBars) {
+        barsInSection = 0;
+        sectionTargetBars = randInt(16, 32);
+        currentSection = pickNextSection(currentSection);
+        currentProgression = pickProgression();
+      }
+    }
+  }
+
+  function scheduler() {
+    while (nextNoteTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
+      scheduleStep(current16th, nextNoteTime, chordIndex);
+      advanceStep();
+    }
+    timerID = setTimeout(scheduler, LOOKAHEAD_MS);
+  }
+
+  // ---------------- playback controls ----------------
+  function startMusic() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return; // browser doesn't support Web Audio; silently do nothing
+      audioCtx = new Ctx();
+      initAudioGraph();
+    }
+    if (audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume();
+    if (isPlaying) return;
+    isPlaying = true;
+    currentBar = 0; current16th = 0; chordIndex = 0;
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    const now = audioCtx.currentTime;
+    masterGain.gain.cancelScheduledValues(now);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+    masterGain.gain.linearRampToValueAtTime(0.75, now + 0.4);
+    scheduler();
+    updateButtons();
+  }
+
+  function stopMusic() {
+    isPlaying = false;
+    if (timerID) { clearTimeout(timerID); timerID = null; }
+    if (audioCtx && masterGain) {
+      const now = audioCtx.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(0, now + 0.2);
+    }
+    updateButtons();
+  }
+
+  function updateButtons() {
+    if (!toggleBtn) return;
+    toggleBtn.textContent = isPlaying ? '⏸' : '🎵';
+    if (isPlaying) toggleBtn.classList.add('active');
+    else toggleBtn.classList.remove('active');
+  }
+
+  // ---------------- UI wiring ----------------
+  const toggleBtn = document.getElementById('musicToggleBtn');
+  const regenBtn = document.getElementById('musicRegenBtn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      if (isPlaying) stopMusic(); else startMusic();
+    });
+  }
+  if (regenBtn) {
+    regenBtn.addEventListener('click', function () {
+      regenerateNow();
+      if (regenBtn.animate) {
+        try { regenBtn.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 400 }); } catch (e) {}
+      }
+    });
+  }
+})();
 </script>
 </body>
 </html>
